@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root { color-scheme: light; }
+        body {
+            margin: 0;
+            background: #ffffff; /* 纯白背景 */
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            height: 100vh; /* 强制全屏高度 */
+            overflow: hidden; /* 禁止滚动 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .shell {
+            padding: 0; /* 移除内边距 */
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .panel {
+            width: 100%;
+            height: 100%;
+            max-width: none; /* 移除最大宽度限制 */
+            aspect-ratio: auto; /* 移除强制比例，由SVG自适应 */
+            border-radius: 0; /* 移除圆角 */
+            background: #ffffff;
+            border: none; /* 移除边框 */
+            box-shadow: none; /* 移除阴影 */
+            padding: 0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .panel svg { 
+            display: block; 
+            width: 100%; 
+            height: 100%; 
+            max-height: 100vh; 
+            margin: 0 auto; 
+            /* 强制清晰渲染 */
+            shape-rendering: geometricPrecision;
+            text-rendering: geometricPrecision;
+        }
+        /* 移除 panel svg.active 相关的样式，因为控制是在内部的 .frame 上 */
+        
+        /* 优化分镜切换动画 - 丝滑 (Silky Smooth 1.2s cross-fade) */
+        .frame { 
+            opacity: 0 !important; 
+            visibility: hidden !important;
+            /* 关键修改：
+               1. 增加 opacity 过渡时间 (0.8s -> 1.2s)
+               2. 使用 visibility 延迟，确保 opacity 完全变 0 后才隐藏，避免闪烁
+               3. 使用 !important 覆盖 SVG 内部可能存在的冲突样式 (display: none)
+               4. 禁用内部定义的 animation
+            */
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 1.2s !important;
+            position: absolute !important; /* 确保帧重叠，以便进行淡入淡出 */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block !important;
+            animation: none !important;
+        }
+        .frame.active { 
+            opacity: 1 !important; 
+            visibility: visible !important;
+            /* 进场时 visibility 立即变为 visible，opacity 慢慢变 1 */
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s !important;
+            z-index: 10 !important; /* 确保当前帧在最上层 */
+            display: block !important;
+            animation: none !important;
+        }
+        .frame.exit {
+            /* 离场状态优化：保持不透明 (Fade In Over Previous)
+               与其让它淡出导致透出底色（闪烁），不如让它保持显示，
+               直到被上层的新帧完全覆盖，然后由 JS 移除。
+            */
+            opacity: 1 !important;
+            visibility: visible !important; 
+            /* transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);  <- 不需要淡出 */
+            z-index: 5 !important; /* 离场帧在下层 */
+            display: block !important;
+            animation: none !important;
+        }
+
+        /* 兼容旧版 .slide-group 的样式 */
+        .slide-group {
+            display: none;
+            opacity: 0;
+        }
+        .slide-group.slide-active {
+            display: block;
+            opacity: 1;
+            animation-duration: 1s;
+            animation-fill-mode: both;
+        }
+        .slide-group.slide-exit {
+            display: block;
+            opacity: 0;
+            transition: opacity 1.2s ease-out;
+            pointer-events: none;
+        }
+        
+        /* 预定义的入场动画效果 */
+        @keyframes slideZoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .slide-group[data-animation="slide-zoom"].slide-active { animation-name: slideZoomIn; transform-origin: center center; }
+
+        @keyframes slideRotateIn { from { transform: rotate(-10deg) scale(0.9); opacity: 0; } to { transform: rotate(0) scale(1); opacity: 1; } }
+        .slide-group[data-animation="slide-rotate"].slide-active { animation-name: slideRotateIn; transform-origin: center center; }
+
+        @keyframes slideFlipIn { from { transform: perspective(1000px) rotateX(90deg); opacity: 0; } to { transform: perspective(1000px) rotateX(0); opacity: 1; } }
+        .slide-group[data-animation="slide-flip"].slide-active { animation-name: slideFlipIn; transform-origin: center center; }
+
+        @keyframes slideBounceIn { 
+            0% { transform: scale(0.3); opacity: 0; } 
+            50% { transform: scale(1.05); opacity: 0.8; } 
+            70% { transform: scale(0.9); opacity: 0.9; } 
+            100% { transform: scale(1); opacity: 1; } 
+        }
+        .slide-group[data-animation="slide-bounce"].slide-active { animation-name: slideBounceIn; transform-origin: center center; }
+
+        @keyframes slideBlurIn { from { filter: blur(10px); opacity: 0; } to { filter: blur(0); opacity: 1; } }
+        .slide-group[data-animation="slide-blur"].slide-active { animation-name: slideBlurIn; }
+
+        /* 电影级运镜系统 - 已禁用 (Disabled per user request for stability) */
+        /* 彻底禁用运镜，防止主体偏移 */
+        .camera-zoom-in, .camera-zoom-out, 
+        .camera-pan-right, .camera-pan-left, .camera-pan-up, 
+        .camera-float { 
+            animation: none !important;
+            transform: none !important;
+        }
+
+        /* Definitions kept for reference but unused
+        @keyframes camZoomIn { from { transform: scale(1); } to { transform: scale(1.4); } }
+        @keyframes camZoomOut { from { transform: scale(1.4); } to { transform: scale(1); } }
+        @keyframes camPanRight { from { transform: translateX(0); } to { transform: translateX(-100px); } }
+        @keyframes camPanLeft { from { transform: translateX(-100px); } to { transform: translateX(0); } }
+        @keyframes camPanUp { from { transform: translateY(0); } to { transform: translateY(-80px); } }
+        @keyframes cam-float { 0% { transform: translateY(0); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0); } }
+        */
+
+        /* 元素入场动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in, .anim-fade-in {
+            animation: fadeIn 1.5s ease-out forwards;
+        }
+
+        @keyframes scaleUp {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-up, .anim-scale-up {
+            animation: scaleUp 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up, .anim-slide-up, .anim-fade-up {
+            animation: slideUp 1s ease-out forwards;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .animate-pulse, .anim-pulse {
+            animation: pulse 2s ease-in-out infinite;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+
+        /* === Object Action Utility Classes (NEW) === */
+        
+        /* Spin */
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .anim-spin-slow {
+            animation: spin 30s linear infinite;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+        .anim-spin-fast {
+            animation: spin 2s linear infinite;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+
+        /* Bounce */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        .anim-bounce {
+            animation: bounce 1s ease-in-out infinite;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+
+        /* Shake */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .anim-shake {
+            animation: shake 0.5s linear infinite;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+
+        /* Float (Object specific) */
+        @keyframes floatObj {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .anim-float {
+            animation: floatObj 3s ease-in-out infinite;
+            transform-origin: center center;
+            transform-box: fill-box;
+        }
+
+        /* Flash */
+        @keyframes flash {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0; }
+        }
+        .anim-flash {
+            animation: flash 1s linear infinite;
+        }
+        
+        /* 确保 SVG 文本清晰 */
+        text {
+            text-rendering: geometricPrecision;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* 字幕区域 */
+        .subtitle-container {
+            position: absolute;
+            bottom: 8%; /* 稍微下调至 8%，平衡位置与防遮挡 */
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            width: 85%;
+            max-width: 900px;
+            /* 去掉黑色背景 */
+            background: transparent;
+            padding: 12px 24px;
+            opacity: 0;
+            transition: opacity 1.2s ease-out, transform 1.2s ease-out;
+            z-index: 10000;
+            pointer-events: none;
+        }
+        .subtitle-container.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .subtitle-text {
+            color: #FFFFFF;
+            font-size: 24px;
+            font-weight: 600;
+            line-height: 1.6;
+            text-align: center;
+            margin: 0;
+            /* 优化文字描边，使其更清晰 */
+            text-shadow: 
+                -1.5px -1.5px 0 rgba(0,0,0,0.8),  
+                 1.5px -1.5px 0 rgba(0,0,0,0.8),
+                -1.5px  1.5px 0 rgba(0,0,0,0.8),
+                 1.5px  1.5px 0 rgba(0,0,0,0.8),
+                 0 2px 4px rgba(0,0,0,0.5);
+            white-space: pre-line;
+            max-width: 100%;
+            word-wrap: break-word;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Global SVG Filters (Always available) -->
+    <svg width="0" height="0" style="position:absolute; pointer-events:none;">
+        <defs>
+            <!-- 1. Realistic Shadow -->
+            <filter id="realistic-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+                <feOffset in="blur" dx="4" dy="4" result="offsetBlur"/>
+                <feComponentTransfer in="offsetBlur" result="shadowMatrix">
+                    <feFuncA type="linear" slope="0.5"/> <!-- Reduce shadow opacity -->
+                </feComponentTransfer>
+                <feMerge>
+                    <feMergeNode in="shadowMatrix"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+
+            <!-- 2. 3D Light (Plastic/shiny surface) -->
+            <filter id="3d-light" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+                <feSpecularLighting in="blur" surfaceScale="5" specularConstant="1" specularExponent="20" lighting-color="white" result="specOut">
+                    <fePointLight x="-5000" y="-10000" z="20000"/>
+                </feSpecularLighting>
+                <feComposite in="specOut" in2="SourceAlpha" operator="in" result="specOut"/>
+                <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="litPaint"/>
+            </filter>
+
+            <!-- 3. Glass Shine (For water/glass) -->
+            <filter id="glass-shine" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur"/>
+                <feSpecularLighting in="blur" surfaceScale="5" specularConstant="1.5" specularExponent="40" lighting-color="white" result="specOut">
+                    <fePointLight x="-5000" y="-10000" z="20000"/>
+                </feSpecularLighting>
+                <feComposite in="specOut" in2="SourceAlpha" operator="in" result="specOut"/>
+                <feMerge>
+                    <feMergeNode in="SourceGraphic"/>
+                    <feMergeNode in="specOut"/>
+                </feMerge>
+            </filter>
+
+            <!-- 4. Soft Glow (For energy/light) -->
+            <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+                <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+
+            <!-- 5. Inner Glow (Volume) -->
+            <filter id="inner-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+                <feComposite in="blur" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowDiff"/>
+                <feFlood flood-color="white" flood-opacity="0.5" result="color"/>
+                <feComposite in="color" in2="shadowDiff" operator="in" result="innerShadow"/>
+                <feMerge>
+                    <feMergeNode in="SourceGraphic"/>
+                    <feMergeNode in="innerShadow"/>
+                </feMerge>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="shell">
+        <div class="panel">
+            {{CONTENT}}
+            
+            <!-- 字幕显示在panel内部 -->
+            <div class="subtitle-container" id="subtitle">
+                <p class="subtitle-text" id="subtitle-text"></p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 错误捕获
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('[全局错误]', message, source, lineno, colno, error);
+            const subtitle = document.getElementById('subtitle-text');
+            if (subtitle) {
+                subtitle.innerHTML = `<span style="color:red;font-size:16px;">Error: ${message}</span>`;
+                document.getElementById('subtitle').classList.add('active');
+            }
+        };
+
+        // 动画数据（由服务端注入）
+        const animationData = {{ANIMATION_DATA}};
+        
+        let currentFrameIndex = 0;
+        let isPlaying = false;
+        let currentAudio = null;
+        let hideSubtitleTimer = null;
+        
+        const subtitleEl = document.getElementById('subtitle');
+        const subtitleTextEl = document.getElementById('subtitle-text');
+        
+        console.log('=== 动画自动播放系统 ===');
+        console.log('Storyboard帧数:', animationData?.storyboard?.length || 0);
+        console.log('音频文件数:', animationData?.audioFiles?.length || 0);
+        
+        // 页面加载完成后立即自动播放
+        window.addEventListener('load', () => {
+            console.log('页面加载完成，自动开始播放');
+            // 延迟500ms后开始播放，确保所有资源就绪
+            setTimeout(() => {
+                startAutoPlay();
+            }, 500);
+        });
+        
+        function startAutoPlay() {
+            if (!animationData || !animationData.storyboard || animationData.storyboard.length === 0) {
+                console.warn('无动画数据，跳过自动播放');
+                return;
+            }
+            
+            if (isPlaying) {
+                return; // 已经在播放中
+            }
+            
+            console.log('[自动播放] 开始');
+            isPlaying = true;
+            
+            // 确保视觉动画重置
+            resetVisualAnimation();
+            
+            currentFrameIndex = 0;
+            // 延迟一点开始第一帧，确保重置完成
+            setTimeout(() => {
+                playFrame(0);
+            }, 100);
+        }
+        
+        function resetVisualAnimation() {
+            // 重置SVG动画（通过克隆节点触发CSS动画重置）
+            const svg = document.querySelector('svg');
+            if (svg) {
+                console.log('[视觉] 重置动画状态');
+                const parent = svg.parentNode;
+                const clone = svg.cloneNode(true);
+                parent.replaceChild(clone, svg);
+            }
+        }
+        
+        // === AUTO-CENTERING LOGIC (NEW & IMPROVED) ===
+        function correctFramePosition(frame, retryCount = 0) {
+            // Prevent double correction
+            if (frame.dataset.corrected === 'true') return;
+
+            // Wait for next paint to ensure layout is ready
+            requestAnimationFrame(() => {
+                // 1. Identify Content vs Background
+                const children = Array.from(frame.children);
+                const contentNodes = [];
+                let bgFound = false;
+
+                for (const child of children) {
+                    // Ignore correction wrapper itself if re-running
+                    if (child.classList.contains('auto-center-wrapper')) return;
+
+                    const tag = child.tagName.toLowerCase();
+                    // Heuristic: Large Rect is Background
+                    if (!bgFound && tag === 'rect') {
+                        const w = parseFloat(child.getAttribute('width') || 0);
+                        const h = parseFloat(child.getAttribute('height') || 0);
+                        // Standard is 1600x900, allow some tolerance
+                        if (w > 1500 && h > 800) {
+                            bgFound = true;
+                            // Force background to strict 0,0 to be safe
+                            child.setAttribute('x', '0');
+                            child.setAttribute('y', '0');
+                            continue; 
+                        }
+                    }
+                    contentNodes.push(child);
+                }
+                
+                if (contentNodes.length === 0) return;
+
+                // 2. Measure Content Bounding Box
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                let validBox = false;
+                let totalArea = 0;
+
+                contentNodes.forEach(node => {
+                    try {
+                        // getBBox works on rendered elements
+                        const bbox = node.getBBox();
+                        // Filter out tiny particles (noise) unless it's the only content
+                        const area = bbox.width * bbox.height;
+                        if (area > 100 || contentNodes.length === 1) { 
+                            minX = Math.min(minX, bbox.x);
+                            minY = Math.min(minY, bbox.y);
+                            maxX = Math.max(maxX, bbox.x + bbox.width);
+                            maxY = Math.max(maxY, bbox.y + bbox.height);
+                            validBox = true;
+                            totalArea += area;
+                        }
+                    } catch(e) { 
+                        // Ignore elements that can't be measured
+                    }
+                });
+
+                if (!validBox) {
+                    // Retry mechanism for loading delays
+                    if (retryCount < 10) {
+                        setTimeout(() => correctFramePosition(frame, retryCount + 1), 200);
+                    }
+                    return;
+                }
+
+                // Mark as corrected so we don't loop
+                frame.dataset.corrected = 'true';
+
+                const cx = (minX + maxX) / 2;
+                const cy = (minY + maxY) / 2;
+
+                // 3. Calculate Deviation
+                const targetX = 800;
+                const targetY = 450;
+                
+                // 强制应用修正，即使偏差很小，确保绝对居中
+                // Removed threshold logic to enforce strict centering
+                
+                const dx = targetX - cx;
+                const dy = targetY - cy;
+                
+                // 4. Apply Correction
+                console.log(`[Auto-Center] Correcting frame ${frame.id}. Offset: ${dx.toFixed(0)}, ${dy.toFixed(0)}`);
+
+                const svgNS = "http://www.w3.org/2000/svg";
+                const wrapper = document.createElementNS(svgNS, "g");
+                wrapper.setAttribute("class", "auto-center-wrapper");
+                // Important: Use translate. This composes with inner transforms.
+                wrapper.setAttribute("transform", `translate(${dx}, ${dy})`);
+
+                // Move content nodes into wrapper
+                contentNodes.forEach(node => {
+                    wrapper.appendChild(node);
+                });
+                
+                // Append wrapper to frame
+                frame.appendChild(wrapper);
+            });
+        }
+
+        function updateVisualFrame(index) {
+            // 确保SVG容器可见
+            const svg = document.querySelector('svg');
+            if (svg && getComputedStyle(svg).display === 'none') {
+                svg.style.display = 'block';
+            }
+
+            // 方法1：处理通过ID控制的SVG分镜 (新的同步机制)
+            const targetFrame = document.getElementById(`frame-${index}`);
+            if (targetFrame) {
+                // 找到当前处于 active 状态的帧 (也就是上一帧)
+                const currentActive = document.querySelector('.frame.active');
+                
+                // 如果是同一帧，不做任何操作
+                if (currentActive && currentActive.id === `frame-${index}`) {
+                    return;
+                }
+
+                // 1. 处理上一帧的离场
+                if (currentActive) {
+                    currentActive.classList.remove('active');
+                    currentActive.classList.add('exit');
+                    
+                    // 动画结束后清理
+                    setTimeout(() => {
+                        currentActive.classList.remove('exit');
+                        // 确保它被隐藏 (由 CSS .frame { display: none } 控制，只要没有 active/exit 类)
+                    }, 1200); // 1.2s 对应 CSS 动画时长
+                }
+                
+                // 2. 清理其他可能的残留帧 (防止快速切换时的堆积)
+                const allFrames = document.querySelectorAll('.frame');
+                allFrames.forEach(f => {
+                    if (f.id !== `frame-${index}` && f !== currentActive) {
+                        f.classList.remove('active');
+                        f.classList.remove('exit');
+                    }
+                });
+                
+                // 3. 显示当前帧 (入场)
+                targetFrame.classList.add('active');
+                // 确保移除 exit 类 (如果它之前正在离场)
+                targetFrame.classList.remove('exit');
+                
+                // === AUTO-CENTER FIX (CRITICAL) ===
+                // Try to correct offset immediately
+                setTimeout(() => {
+                    correctFramePosition(targetFrame);
+                }, 0);
+
+                return;
+            }
+
+            // 方法2：处理分镜式动画 (.slide-group) - 兼容旧版
+            const slideGroups = document.querySelectorAll('.slide-group');
+            if (slideGroups.length > 0) {
+                slideGroups.forEach((g, i) => {
+                    if (i === index) {
+                        // 进场：清理 exit 状态，添加 active
+                        g.classList.remove('slide-exit');
+                        g.classList.add('slide-active');
+                        // 强制重绘以确保动画重新触发
+                        g.style.animationName = 'none';
+                        void g.offsetHeight; // 触发回流
+                        g.style.animationName = '';
+                    } else {
+                        // 离场：如果是 active，转为 exit
+                        if (g.classList.contains('slide-active')) {
+                            g.classList.remove('slide-active');
+                            g.classList.add('slide-exit');
+                            
+                            // 动画结束后清理 (配合CSS动画时间 1.2s)
+                            setTimeout(() => {
+                                if (g.classList.contains('slide-exit')) {
+                                    g.classList.remove('slide-exit');
+                                }
+                            }, 1200);
+                        }
+                        // 如果既不是 active 也不是 exit，它就是隐藏的 (CSS display: none)
+                    }
+                });
+                return;
+            }
+            
+            console.warn(`[视觉] 未找到第 ${index} 帧的视觉元素 (frame-${index} 或 .slide-group)`);
+        }
+
+        function playFrame(index) {
+            if (!isPlaying || index >= animationData.storyboard.length) {
+                // 播放完成，循环播放
+                console.log('[自动播放] 一轮完成，2秒后重新开始');
+                hideSubtitle();
+                setTimeout(() => {
+                    if (isPlaying) {
+                        startAutoPlay(); // 使用startAutoPlay来重置并开始
+                    }
+                }, 2000);
+                return;
+            }
+            
+            currentFrameIndex = index;
+            
+            // 更新画面
+            updateVisualFrame(index);
+            
+            const frame = animationData.storyboard[index];
+            const narration = frame.narration || frame.body || frame.heading || '';
+            const audioFile = animationData.audioFiles && animationData.audioFiles[index];
+            
+            console.log(`[播放] 第${index + 1}/${animationData.storyboard.length}帧`);
+            console.log(`[播放] 字幕: ${narration.substring(0, 30)}...`);
+            console.log(`[播放] 音频: ${audioFile || '无'}`);
+            
+            if (audioFile) {
+                // 有音频文件，播放音频并同步字幕
+                playAudioWithProgressiveSubtitle(audioFile, narration, () => {
+                    // 音频播放完成，0.5秒后播放下一帧
+                    setTimeout(() => {
+                        playFrame(index + 1);
+                    }, 500);
+                });
+            } else {
+                // 无音频，只显示字幕5秒（如果有分行，按行显示）
+                playTextOnlyProgressiveSubtitle(narration, 5000, () => {
+                    playFrame(index + 1);
+                });
+            }
+        }
+        
+        // 纯文本的分段显示
+        function playTextOnlyProgressiveSubtitle(text, totalDuration, onComplete) {
+            const segments = splitTextIntoSegments(text);
+            if (segments.length <= 1) {
+                showSubtitle(text, totalDuration);
+                setTimeout(onComplete, totalDuration);
+                return;
+            }
+            
+            let currentTime = 0;
+            const totalChars = segments.reduce((acc, seg) => acc + seg.replace(/<[^>]*>/g, '').length, 0);
+            
+            segments.forEach((segment, i) => {
+                const segLen = segment.replace(/<[^>]*>/g, '').length;
+                // 保证每段至少显示1秒，除非总时长不够
+                let duration = (segLen / totalChars) * totalDuration;
+                if (duration < 1000 && totalDuration > segments.length * 1000) duration = 1000;
+                
+                setTimeout(() => {
+                    showSubtitle(segment, duration);
+                }, currentTime);
+                
+                currentTime += duration;
+            });
+            
+            // 确保最后回调执行
+            setTimeout(onComplete, Math.max(currentTime, totalDuration));
+        }
+
+        // === 视频导出优化接口 ===
+        
+        window.timelineData = null;
+        window.isExportMode = false;
+
+        // 预计算时间轴数据
+        window.prepareTimeline = async function() {
+            console.log('[导出] 准备时间轴数据...');
+            window.isExportMode = true;
+            isPlaying = false; // 停止自动播放
+            
+            // 停止所有正在进行的音频和定时器
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            // 清除所有定时器
+            let id = window.setTimeout(function() {}, 0);
+            while (id--) {
+                window.clearTimeout(id);
+            }
+
+            const timeline = [];
+            let globalTime = 0;
+            
+            // 确保动画数据存在
+            if (!animationData || !animationData.storyboard) {
+                console.error('[导出] 无动画数据');
+                return null;
+            }
+            
+            for (let i = 0; i < animationData.storyboard.length; i++) {
+                const frame = animationData.storyboard[i];
+                const audioFile = animationData.audioFiles && animationData.audioFiles[i];
+                let narration = frame.narration || frame.body || frame.heading || '';
+                
+                // 优化：移除字幕开头和结尾的标点符号
+                narration = narration.replace(/^[^\w\u4e00-\u9fa5\s]+|[^\w\u4e00-\u9fa5\s]+$/g, '').trim();
+                
+                let duration = 5000;
+                
+                // 优先使用Python传递的精确时长
+                if (animationData.frameDurations && animationData.frameDurations[i]) {
+                    duration = animationData.frameDurations[i] * 1000;
+                    console.log(`[导出] 使用预设时长: ${duration}ms (第${i+1}帧)`);
+                } else if (audioFile) {
+                    try {
+                        duration = await getAudioDuration(audioFile) * 1000;
+                    } catch (e) {
+                        console.warn(`[导出] 获取音频时长失败: ${audioFile}`, e);
+                        duration = 5000;
+                    }
+                } else if (narration) {
+                    // 无音频时，根据字数估算时长 (每字300ms + 1s缓冲)
+                    const charCount = narration.replace(/<[^>]*>/g, '').length;
+                    duration = Math.max(3000, charCount * 300 + 1000);
+                }
+                
+                // 计算字幕分段
+                const segments = splitTextIntoSegments(narration);
+                const subtitleEvents = [];
+                
+                if (segments.length > 0) {
+                    const totalChars = segments.reduce((acc, seg) => acc + seg.replace(/<[^>]*>/g, '').length, 0);
+                    let segStartTime = 0;
+                    
+                    segments.forEach(seg => {
+                        const segLen = seg.replace(/<[^>]*>/g, '').length;
+                        let segDur = (segLen / totalChars) * duration;
+                        // 最小1秒逻辑
+                        if (segDur < 1000 && duration > segments.length * 1000) segDur = 1000;
+                        
+                        // 修复：移除字幕行尾的标点符号
+                        const cleanText = seg.replace(/[，。；？！,.;?!：:]+\s*$/, '');
+                        
+                        subtitleEvents.push({
+                            text: cleanText,
+                            startTime: segStartTime,
+                            endTime: segStartTime + segDur
+                        });
+                        segStartTime += segDur;
+                    });
+                }
+                
+                // 修复：移除额外的帧间间隔，确保与音频时长完全同步
+                // 每一帧的总时长应该严格等于音频时长（如果存在音频）
+                // 之前添加的 +500ms 会导致视频与音频逐渐不同步
+                const lastSubTime = subtitleEvents.length > 0 ? subtitleEvents[subtitleEvents.length-1].endTime : 0;
+                
+                // 如果是根据音频确定的时长，严格使用该时长
+                // 如果是纯文本估算的时长，可以使用宽松的策略
+                let totalFrameDuration;
+                if (audioFile) {
+                    totalFrameDuration = duration;
+                    // 确保字幕不会超出音频时长
+                    if (lastSubTime > totalFrameDuration) {
+                        console.warn(`[导出] 警告：第${i}帧字幕时长(${lastSubTime}ms)超出音频时长(${totalFrameDuration}ms)，将被截断`);
+                    }
+                } else {
+                    totalFrameDuration = Math.max(duration, lastSubTime);
+                }
+                
+                timeline.push({
+                    index: i,
+                    globalStartTime: globalTime,
+                    globalEndTime: globalTime + totalFrameDuration,
+                    contentDuration: totalFrameDuration, // 内容时长即为帧时长
+                    subtitles: subtitleEvents
+                });
+                
+                globalTime += totalFrameDuration;
+            }
+            
+            window.timelineData = {
+                frames: timeline,
+                totalDuration: globalTime
+            };
+            
+            console.log('[导出] 时间轴准备完成:', window.timelineData);
+            return window.timelineData;
+        };
+        
+        function getAudioDuration(url) {
+            return new Promise((resolve, reject) => {
+                const audio = new Audio(url);
+                audio.addEventListener('loadedmetadata', () => {
+                    resolve(audio.duration);
+                });
+                audio.addEventListener('error', (e) => {
+                    // 音频加载失败，返回默认时长
+                    console.warn(`音频加载失败: ${url}`);
+                    resolve(5); 
+                });
+                // 设置超时防止卡死
+                setTimeout(() => resolve(5), 3000); 
+            });
+        }
+        
+        // 跳转到指定时间点 (毫秒)
+        window.seekTo = function(timeMs) {
+            if (!window.timelineData) return;
+            
+            const { frames } = window.timelineData;
+            
+            // 找到当前帧
+            // 修正：如果超出范围，默认显示最后一帧或第一帧，防止黑屏
+            let currentFrame = frames.find(f => timeMs >= f.globalStartTime && timeMs < f.globalEndTime);
+            
+            if (!currentFrame) {
+                if (timeMs >= frames[frames.length-1].globalEndTime) {
+                    currentFrame = frames[frames.length-1];
+                } else if (timeMs < 0) {
+                    currentFrame = frames[0];
+                } else {
+                    // 可能是间隔期，显示前一帧
+                    const prevFrame = frames.filter(f => f.globalEndTime <= timeMs).pop();
+                    currentFrame = prevFrame || frames[0];
+                }
+            }
+            
+            // 1. 切换视觉帧
+            if (currentFrameIndex !== currentFrame.index) {
+                updateVisualFrame(currentFrame.index);
+                currentFrameIndex = currentFrame.index;
+            }
+            
+            // 2. 计算帧内时间
+            const localTime = timeMs - currentFrame.globalStartTime;
+            
+            // 3. 更新字幕
+            const subtitleContainer = document.getElementById('subtitle');
+            const subtitleTextEl = document.getElementById('subtitle-text');
+            
+            // 只有在内容时长内才显示字幕（避开最后的间隔）
+            if (localTime < currentFrame.contentDuration) {
+                const sub = currentFrame.subtitles.find(s => localTime >= s.startTime && localTime < s.endTime);
+                if (sub) {
+                    subtitleTextEl.innerHTML = sub.text;
+                    subtitleContainer.classList.add('active');
+                } else {
+                    // 如果没有匹配的，但还在 contentDuration 内，显示最后一个已经开始的（保持显示）
+                    const lastSub = currentFrame.subtitles.filter(s => s.startTime <= localTime).pop();
+                    if (lastSub) {
+                        subtitleTextEl.innerHTML = lastSub.text;
+                        subtitleContainer.classList.add('active');
+                    } else {
+                         // 还没开始第一个字幕
+                         subtitleContainer.classList.remove('active');
+                    }
+                }
+            } else {
+                subtitleContainer.classList.remove('active');
+            }
+            
+            // 4. 控制 CSS 动画
+            // 将所有动画暂停，并设置 delay 为 -localTime
+            pauseAndSeekCSSAnimations(localTime / 1000);
+            
+            // 5. 控制 SVG SMIL 动画
+            const svg = document.querySelector('svg');
+            if (svg && svg.pauseAnimations) {
+                try {
+                    svg.pauseAnimations();
+                    svg.setCurrentTime(localTime / 1000);
+                } catch(e) {
+                    console.warn('SMIL control error', e);
+                }
+            }
+        };
+        
+        function pauseAndSeekCSSAnimations(offsetSeconds) {
+            // 优化：只选择可见的 active 帧内的元素，减少计算量
+            const activeFrame = document.querySelector('.frame.active');
+            const scope = activeFrame || document;
+            const elements = scope.querySelectorAll('*');
+            
+            elements.forEach(el => {
+                const style = window.getComputedStyle(el);
+                if (style.animationName && style.animationName !== 'none') {
+                    // 保存原始 delay
+                    if (!el.dataset.originalDelay) {
+                        el.dataset.originalDelay = style.animationDelay || '0s';
+                    }
+                    
+                    // 解析原始 delay (可能有多个)
+                    const originalDelays = el.dataset.originalDelay.split(',').map(d => {
+                         const val = parseFloat(d);
+                         return isNaN(val) ? 0 : val;
+                    });
+                    
+                    // 新 delay = original - offset
+                    const newDelays = originalDelays.map(d => `${d - offsetSeconds}s`).join(',');
+                    
+                    el.style.animationPlayState = 'paused';
+                    el.style.animationDelay = newDelays;
+                }
+            });
+        }
+
+        function playAudioWithProgressiveSubtitle(audioPath, fullSubtitle, onComplete) {
+            // 停止之前的音频
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+            }
+            
+            const audio = new Audio(audioPath);
+            currentAudio = audio;
+            
+            // 预处理字幕分段
+            const segments = splitTextIntoSegments(fullSubtitle);
+            
+            // 等待元数据加载完成，以获取准确的音频时长
+            audio.addEventListener('loadedmetadata', () => {
+                const totalDuration = audio.duration * 1000; // 转换为毫秒
+                console.log('[音频] 元数据加载完成，时长:', totalDuration + 'ms');
+                
+                // 规划字幕显示时间轴
+                scheduleSubtitles(segments, totalDuration);
+                
+                // 开始播放音频
+                const playPromise = audio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('[音频] 播放开始');
+                    }).catch(err => {
+                        console.error('[音频] 播放失败:', err);
+                        // 即使音频失败，字幕仍然显示
+                        if (onComplete) {
+                            setTimeout(onComplete, totalDuration);
+                        }
+                    });
+                }
+            }, { once: true });
+            
+            // 音频播放完成
+            audio.addEventListener('ended', () => {
+                console.log('[音频] 播放完成');
+                hideSubtitle();
+                currentAudio = null;
+                if (onComplete) onComplete();
+            }, { once: true });
+            
+            // 音频加载错误
+            audio.addEventListener('error', (e) => {
+                console.error('[音频] 加载失败:', e);
+                // 音频失败也显示字幕
+                playTextOnlyProgressiveSubtitle(fullSubtitle, 5000, onComplete);
+                currentAudio = null;
+            }, { once: true });
+            
+            // 设置3秒超时
+            setTimeout(() => {
+                if (currentAudio === audio && audio.paused) {
+                    console.warn('[音频] 3秒未开始播放，强制继续');
+                    playTextOnlyProgressiveSubtitle(fullSubtitle, 5000, onComplete);
+                }
+            }, 3000);
+            
+            // 开始加载音频
+            audio.load();
+        }
+        
+        // 将文本拆分为显示片段
+        function splitTextIntoSegments(text) {
+            if (!text) return [];
+            
+            // 如果包含 HTML 换行符 <br>，优先按换行符分割
+            if (text.includes('<br') || text.includes('<BR')) {
+                return text.split(/<br\s*\/?>/i).map(s => s.trim()).filter(s => s.length > 0);
+            }
+            
+            // 策略：
+            // 1. 先按主标点（句号、问号、感叹号）分割
+            // 2. 对过长的片段（>22字符），按次级标点（逗号、分号）分割
+            // 3. 仍然过长的，强制按长度切分（避免两行显示）
+            
+            const MAX_LEN = 22;
+            
+            // 1. 主标点分割
+            const rawParts = text.split(/([。！？\.\!\?])/);
+            let primarySegments = [];
+            for (let i = 0; i < rawParts.length; i += 2) {
+                let segment = rawParts[i];
+                if (i + 1 < rawParts.length) segment += rawParts[i + 1];
+                if (segment.trim()) primarySegments.push(segment.trim());
+            }
+            if (primarySegments.length === 0) primarySegments = [text];
+            
+            // 2. 次级分割与长度控制
+            const finalSegments = [];
+            
+            primarySegments.forEach(seg => {
+                if (seg.length <= MAX_LEN) {
+                    finalSegments.push(seg);
+                } else {
+                    // 需要进一步分割
+                    const subParts = seg.split(/([，,；;：:])/);
+                    let current = "";
+                    
+                    for (let i = 0; i < subParts.length; i++) {
+                        const part = subParts[i];
+                        
+                        // 如果是标点
+                        if (part.match(/[，,；;：:]/)) {
+                            current += part;
+                            // 遇到标点，检查是否可以切分
+                            if (current.length > 8) { // 避免切出太短的碎句
+                                finalSegments.push(current);
+                                current = "";
+                            }
+                        } else {
+                            // 是文本内容
+                            // 如果加上去会超长，且current已有内容，先切分current
+                            if (current.length + part.length > MAX_LEN && current.length > 5) {
+                                finalSegments.push(current);
+                                current = part;
+                            } else {
+                                current += part;
+                            }
+                        }
+                    }
+                    if (current) finalSegments.push(current);
+                }
+            });
+            
+            return finalSegments;
+        }
+        
+        function scheduleSubtitles(segments, totalDuration) {
+            if (segments.length === 0) return;
+            
+            const totalChars = segments.reduce((acc, seg) => acc + seg.replace(/<[^>]*>/g, '').length, 0);
+            if (totalChars === 0) return;
+            
+            let currentTime = 0;
+            
+            segments.forEach(segment => {
+                const segLen = segment.replace(/<[^>]*>/g, '').length;
+                // 根据字符数比例分配时间
+                const duration = (segLen / totalChars) * totalDuration;
+                
+                setTimeout(() => {
+                    if (currentAudio && !currentAudio.paused) {
+                        showSubtitle(segment, duration);
+                    }
+                }, currentTime);
+                
+                currentTime += duration;
+            });
+        }
+        
+        function showSubtitle(text, duration) {
+            if (!text) return;
+            
+            // 移除末尾标点符号 (优化字幕显示体验)
+            text = text.replace(/[，。；？！,.;?!：:]+\s*$/, '');
+            
+            console.log('[字幕] 显示:', text, `持续${duration}ms`);
+            
+            // 清除之前的隐藏定时器
+            if (hideSubtitleTimer) {
+                clearTimeout(hideSubtitleTimer);
+                hideSubtitleTimer = null;
+            }
+            
+            // 设置字幕文本 (支持HTML标签如<br>)
+            subtitleTextEl.innerHTML = text;
+            
+            // 立即显示字幕（移除所有延迟）
+            subtitleEl.classList.add('active');
+            
+            // 设置自动隐藏（字幕显示完整时长）
+            hideSubtitleTimer = setTimeout(() => {
+                hideSubtitle();
+            }, Math.max(duration - 200, duration * 0.95)); // 稍微提前一点淡出
+        }
+        
+        function hideSubtitle() {
+            console.log('[字幕] 隐藏');
+            
+            if (hideSubtitleTimer) {
+                clearTimeout(hideSubtitleTimer);
+                hideSubtitleTimer = null;
+            }
+            
+            // 淡出字幕
+            subtitleEl.classList.remove('active');
+        }
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            isPlaying = false;
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            if (hideSubtitleTimer) {
+                clearTimeout(hideSubtitleTimer);
+            }
+        });
+    </script>
+</body>
+</html>

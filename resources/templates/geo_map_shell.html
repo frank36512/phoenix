@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html style="height: 100%">
+<head>
+    <meta charset="utf-8">
+    <title>{{TITLE}}</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2/dist/echarts-gl.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #f0f2f5; font-family: 'Microsoft YaHei', sans-serif; }
+        #bg-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #container { height: 100vh; width: 100vw; position: relative; z-index: 1; }
+        .loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 20px; color: #666;
+        }
+        .control-panel {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 100;
+            background: rgba(255,255,255,0.8);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: none;
+        }
+        button {
+            padding: 8px 16px;
+            background: #4F46E5;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #4338CA; }
+    </style>
+</head>
+<body style="height: 100%; margin: 0">
+    <div id="bg-layer"></div>
+    <div id="container">
+        <div class="loading">正在加载地图数据...</div>
+    </div>
+    <div class="control-panel" id="controlPanel">
+        <button id="replayBtn">重播动画</button>
+    </div>
+
+    <script type="text/javascript">
+        // ES5 Polyfills
+        if (typeof Object.assign !== 'function') {
+            Object.assign = function(target) {
+                'use strict';
+                if (target === null || target === undefined) {
+                    throw new TypeError('Cannot convert undefined or null to object');
+                }
+                var to = Object(target);
+                for (var index = 1; index < arguments.length; index++) {
+                    var nextSource = arguments[index];
+                    if (nextSource !== null && nextSource !== undefined) {
+                        for (var nextKey in nextSource) {
+                            if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+                                to[nextKey] = nextSource[nextKey];
+                            }
+                        }
+                    }
+                }
+                return to;
+            };
+        }
+
+        var rawData = {{DATA_JSON}};
+        var mapType = rawData.mapType || 'china';
+        var mapPinyin = (rawData.mapPinyin || 'china').toLowerCase().replace(/\s+/g, '');
+        
+        var myChart;
+        var geoCoordMap = {};
+        var config = {
+            visualizationType: 'default',
+            backgroundColor: '#f0f2f5',
+            backgroundImage: "",
+            bgOpacity: 1.0,
+            fontFamily: 'Microsoft YaHei',
+            fontSize: 24,
+            fontColor: '#333',
+            labelSize: 12,
+            labelColor: '#000',
+            visualMapColors: ['#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'],
+            areaColor: '#eee',
+            areaHoverColor: '#FFD700',
+            borderColor: '#000',
+            borderShadowBlur: 0,
+            borderShadowColor: 'transparent',
+            showLabel: true,
+            show3D: false,
+            dataSource: "",
+            author: "",
+            note: ""
+        };
+        
+        // Inject User Settings (Overwrite defaults)
+        try {
+            var userSettings = {}; 
+            // Placeholder for future server-side config injection: {{CONFIG_JSON}}
+            if (userSettings) Object.assign(config, userSettings);
+        } catch(e) {
+            console.log("No user settings injected or invalid JSON");
+        }
+
+        // Global Whitelist for Valid Regions (Strict Filtering)
+        var ALLOWED_REGIONS = [
+            '北京', '天津', '上海', '重庆', '河北', '山西', '辽宁', '吉林', '黑龙江', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南', '广东', '海南', '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾', '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门',
+            '北京市', '天津市', '上海市', '重庆市', '河北省', '山西省', '辽宁省', '吉林省', '黑龙江省', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省', '湖北省', '湖南省', '广东省', '海南省', '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省', '台湾省', '内蒙古自治区', '广西壮族自治区', '西藏自治区', '宁夏回族自治区', '新疆维吾尔自治区', '香港特别行政区', '澳门特别行政区'
+        ];
+
+        var originalMapType = mapType; // Save original for thumbnail reference
+
+        // Manual visual center corrections for 3D map (Geometric Center approximation)
+        var geoCenterFix = {
+            '内蒙古': [114.0, 44.0], '内蒙古自治区': [114.0, 44.0],
+            '甘肃': [103.8, 36.0], '甘肃省': [103.8, 36.0],
+            '河北': [115.5, 38.5], '河北省': [115.5, 38.5],
+            '陕西': [109.0, 35.5], '陕西省': [109.0, 35.5],
+            '黑龙江': [128.0, 47.5], '黑龙江省': [128.0, 47.5],
+            '吉林': [126.0, 43.5], '吉林省': [126.0, 43.5],
+            '辽宁': [123.0, 41.5], '辽宁省': [123.0, 41.5],
+            '四川': [102.5, 30.5], '四川省': [102.5, 30.5],
+            '云南': [101.5, 24.5], '云南省': [101.5, 24.5],
+            '西藏': [88.0, 31.0], '西藏自治区': [88.0, 31.0],
+            '新疆': [85.0, 41.0], '新疆维吾尔自治区': [85.0, 41.0],
+            '青海': [96.0, 35.5], '青海省': [96.0, 35.5],
+            '广东': [113.5, 23.5], '广东省': [113.5, 23.5],
+            '广西': [108.5, 23.5], '广西壮族自治区': [108.5, 23.5],
+            '湖南': [111.5, 27.5], '湖南省': [111.5, 27.5],
+            '湖北': [112.0, 31.0], '湖北省': [112.0, 31.0],
+            '江西': [115.5, 27.5], '江西省': [115.5, 27.5],
+            '安徽': [117.0, 32.0], '安徽省': [117.0, 32.0],
+            '江苏': [119.5, 33.0], '江苏省': [119.5, 33.0],
+            '浙江': [120.0, 29.0], '浙江省': [120.0, 29.0],
+            '福建': [118.0, 26.0], '福建省': [118.0, 26.0]
+        };
+        
+        // Helper to shorten names (Global)
+        function getShortName(name) {
+            if (!name) return '';
+            var short = name.toString().trim();
+            // Special case for Inner Mongolia
+            if (short.indexOf('内蒙古') === 0) return '内蒙古';
+            // Remove common suffixes and ethnic group names
+            short = short.replace(/(?:省|市|自治区|特别行政区|壮族|回族|维吾尔族|维吾尔)/g, '');
+            // Final trim just in case
+            return short.trim();
+        }
+
+        function shouldUseChinaWhitelist() {
+            return originalMapType === 'china' || mapType === 'china' || mapType === 'china_clean';
+        }
+
+        function isAllowedRegion(name) {
+            if (!name) return false;
+            if (!shouldUseChinaWhitelist()) return true;
+            var short = getShortName(name);
+            var ALLOWED_SHORT = [
+                '北京', '天津', '上海', '重庆', '河北', '山西', '辽宁', '吉林', '黑龙江', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南', '广东', '海南', '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾', '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门'
+            ];
+            return ALLOWED_SHORT.indexOf(short) !== -1;
+        }
+
+        // Map Loading Logic
+        {{MAP_LOADER_SCRIPT}}
+
+        function cleanGeoJSON() {
+            // Deprecated: This function does not work with encoded map data and causes Hainan to disappear.
+            // Map cleaning is now handled server-side by clean_map_encoded.py
+        }
+
+        function initGeoCoordMap() {
+            var baseMap = echarts.getMap(originalMapType) || echarts.getMap(mapType);
+            if (!baseMap) return;
+            var mapJson = JSON.parse(JSON.stringify(baseMap.geoJSON)); // Deep clone to avoid polluting original
+            if (!mapJson) return;
+
+            // --- FILTERING GEOJSON FEATURES ---
+            // Remove any feature that is NOT in the standard whitelist (fixes residue points)
+            var filteredFeatures = [];
+            for (var i = 0; i < mapJson.features.length; i++) {
+                var feature = mapJson.features[i];
+                var name = feature.properties.name;
+                if (!shouldUseChinaWhitelist() || isAllowedRegion(name)) {
+                    if (feature && feature.properties && feature.properties.centroid && feature.properties.centroid.length === 2) {
+                        feature.properties.cp = feature.properties.centroid;
+                    }
+                    // Manual visual center corrections
+                    if (geoCenterFix[name]) {
+                        feature.properties.cp = geoCenterFix[name];
+                    } else {
+                        var simpleName = getShortName(name);
+                        if (geoCenterFix[simpleName]) {
+                            feature.properties.cp = geoCenterFix[simpleName];
+                        }
+                    }
+                    
+                    var cp = feature.properties.cp || feature.properties.center;
+                    if (cp) {
+                        geoCoordMap[name] = cp;
+                        geoCoordMap[getShortName(name)] = cp;
+                    }
+                    if (shouldUseChinaWhitelist()) {
+                        filteredFeatures.push(feature);
+                    }
+                }
+            }
+            if (shouldUseChinaWhitelist()) {
+                mapJson.features = filteredFeatures;
+            }
+
+            // Re-register the map to apply changes
+            if (shouldUseChinaWhitelist()) {
+                var cleanMapName = 'china_clean'; 
+                echarts.registerMap(cleanMapName, mapJson);
+                mapType = cleanMapName; 
+            }
+        }
+
+        function initChart() {
+            var dom = document.getElementById('container');
+            dom.innerHTML = ''; 
+            myChart = echarts.init(dom);
+            processData();
+            updateOption();
+
+            if (rawData.timeline) {
+                document.getElementById('controlPanel').style.display = 'block';
+                document.getElementById('replayBtn').onclick = function() {
+                    myChart.dispatchAction({ type: 'timelineChange', currentIndex: 0 });
+                    myChart.dispatchAction({ type: 'timelinePlayChange', playState: true });
+                };
+            }
+            applyGlobalStyles();
+            window.onresize = function() { myChart.resize(); };
+        }
+        
+        function processData() {
+            initGeoCoordMap(); // Initialize coordinates for 3D shapes
+            if (mapType === 'china' || mapType === 'china_clean') {
+                var nameMap = {
+                    '北京': '北京市', '天津': '天津市', '上海': '上海市', '重庆': '重庆市',
+                    '河北': '河北省', '山西': '山西省', '辽宁': '辽宁省', '吉林': '吉林省',
+                    '黑龙江': '黑龙江省', '江苏': '江苏省', '浙江': '浙江省', '安徽': '安徽省',
+                    '福建': '福建省', '江西': '江西省', '山东': '山东省', '河南': '河南省',
+                    '湖北': '湖北省', '湖南': '湖南省', '广东': '广东省', '海南': '海南省',
+                    '四川': '四川省', '贵州': '贵州省', '云南': '云南省', '陕西': '陕西省',
+                    '甘肃': '甘肃省', '青海': '青海省', '台湾': '台湾省',
+                    '内蒙古': '内蒙古自治区', '广西': '广西壮族自治区', '西藏': '西藏自治区',
+                    '宁夏': '宁夏回族自治区', '新疆': '新疆维吾尔自治区',
+                    '香港': '香港特别行政区', '澳门': '澳门特别行政区'
+                };
+
+                // Manual offsets for crowded regions to prevent label overlap
+                // [x, y] positive x is right, positive y is down
+                var labelOffsets = {
+                    '北京市': [0, -15],   // Up
+                    '天津市': [0, 15],    // Down
+                    '河北省': [-30, 0]    // Left
+                };
+
+                function mapName(item) {
+                    if (nameMap[item.name]) item.name = nameMap[item.name];
+                    
+                    // Apply offset if defined
+                    if (labelOffsets[item.name]) {
+                        if (!item.label) item.label = {};
+                        item.label.offset = labelOffsets[item.name];
+                        // Force show label for these key regions even if overlap strategy might hide them
+                        item.label.show = true; 
+                    }
+                }
+                if (rawData.timeline && rawData.data) {
+                    rawData.data.forEach(function(yearData) {
+                        if (Array.isArray(yearData)) yearData.forEach(mapName);
+                    });
+                } else if (rawData.data) {
+                    rawData.data.forEach(mapName);
+                }
+            }
+        }
+
+        function getOption() {
+            var maxValue = 0;
+            if (rawData.timeline && rawData.data) {
+                rawData.data.forEach(function(yearData) {
+                    if (Array.isArray(yearData)) {
+                        var values = yearData.map(function(item) { return item.value; });
+                        var m = Math.max.apply(null, values);
+                        if (m > maxValue) maxValue = m;
+                    }
+                });
+            } else if (rawData.data && rawData.data.length > 0) {
+                var values = rawData.data.map(function(item) { return item.value; });
+                maxValue = Math.max.apply(null, values);
+            }
+            if (maxValue === 0) maxValue = 100;
+
+            // --- Shared Helpers for 3D Maps (Moved to function scope to avoid block-scope syntax errors) ---
+            function getColor(val) {
+                var t = val / maxValue;
+                var colors = config.visualMapColors;
+                var idx = Math.floor(t * (colors.length - 1));
+                return colors[idx] || colors[colors.length-1];
+            }
+
+            function getRegionLabelStyle() {
+                return {
+                    show: config.showLabel,
+                    distance: 2,
+                    textStyle: {
+                        color: config.labelColor || config.fontColor,
+                        fontSize: config.labelSize || 12,
+                        fontWeight: 'normal',
+                        borderWidth: 4,
+                        borderColor: 'rgba(255,255,255,0)', 
+                        backgroundColor: 'rgba(255,255,255,0.01)', 
+                        padding: [6, 8], 
+                        lineHeight: (config.labelSize || 12) * 1.5, 
+                        verticalAlign: 'middle',
+                        align: 'center',
+                        opacity: 1
+                    }
+                };
+            }
+
+            function getBar3DGeo(data) {
+                data = getFilteredData(data);
+                var regions = [];
+                
+                // Explicitly hide Nanhai/Nine-dash line from 3D map to prevent residue points
+                if (mapType === 'china' || mapType === 'china_clean') {
+                    regions.push({ name: '南海诸岛', itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } } });
+                    regions.push({ name: '九段线', itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } } });
+                }
+
+                if (data) {
+                    data.forEach(function(item) {
+                        regions.push({
+                            name: item.name,
+                            itemStyle: { color: getColor(item.value), opacity: 1, borderWidth: 0.5, borderColor: config.borderColor },
+                            label: { show: false }, 
+                            emphasis: { label: { show: false }, itemStyle: { areaColor: config.areaHoverColor } }
+                        });
+                    });
+                }
+                return {
+                    map: mapType, roam: true,
+                    itemStyle: { areaColor: config.areaColor, opacity: 1, borderWidth: 0.5, borderColor: config.borderColor },
+                    label: { show: false }, 
+                    emphasis: { label: { show: false } },
+                    shading: 'lambert',
+                    light: { main: { intensity: 1, shadow: true, alpha: 30 }, ambient: { intensity: 0.3 } },
+                    viewControl: { distance: 100, alpha: 30, beta: 30 },
+                    regions: regions
+                };
+            }
+
+            function getBar3DSeries(data) {
+                data = getFilteredData(data);
+                var shape = config.barShape || 'cuboid';
+                var series = [];
+                
+                // Labels are handled by getScatter3DLabelSeries for all 3D modes now
+                // This ensures consistency and better positioning
+                function toBarData(heightScale) {
+                    return data.map(function(item) { 
+                        if (!item || !item.name) return null;
+                        var short = getShortName(item.name);
+                        if (shouldUseChinaWhitelist() && (short === '南海诸岛' || short === '九段线' || short === '十段线')) return null;
+                        var coord = geoCoordMap[item.name] || geoCoordMap[short];
+                        if (!coord) return null;
+                        var v = (item.value !== undefined && item.value !== null) ? item.value : 0;
+                        return { name: item.name, value: [coord[0], coord[1], v * (heightScale || 1)], rawValue: v, itemStyle: { color: getColor(v) } };
+                    }).filter(function(i){return i});
+                }
+
+                function makeBarLayer(layerName, barSize, heightScale, zlevel) {
+                    return {
+                        name: layerName,
+                        type: 'bar3D',
+                        coordinateSystem: 'geo3D',
+                        shading: 'lambert',
+                        zlevel: zlevel || 10,
+                        barSize: barSize,
+                        minHeight: 1,
+                        itemStyle: { opacity: 0.98 },
+                        data: toBarData(heightScale)
+                    };
+                }
+
+                if (shape === 'cylinder') {
+                    // Optimized Cylinder: High bevel to simulate roundness
+                    var s0 = makeBarLayer((rawData.visualMapName || '数据') + '_cylinder', 3.0, 1, 10);
+                    s0.shading = 'realistic';
+                    s0.bevelSize = 1.45; // Close to barSize/2 (1.5)
+                    s0.bevelSegments = 10; // Reduced from 20 to prevent WebGL context overload
+                    s0.bevelSmoothness = 2;
+                    s0.realisticMaterial = { roughness: 0.3, metalness: 0 };
+                    series.push(s0);
+                } else if (shape === 'cone') {
+                    // Optimized Cone: Stacked layers (Reduced count for performance)
+                    var layers = 6; // Reduced from 20 to 6 to prevent WebGL crash
+                    var maxBarSize = 3.0;
+                    for (var i = 0; i < layers; i++) {
+                        var ratio = (i + 1) / layers;
+                        var hScale = ratio;
+                        var bSize = maxBarSize * (1 - (i / layers)); 
+                        if (bSize < 0.1) bSize = 0.1;
+                        
+                        var s = makeBarLayer((rawData.visualMapName || '数据') + '_cone_' + i, bSize, hScale, 10 + i);
+                        s.shading = 'realistic';
+                        s.bevelSize = bSize / 2 - 0.05; // Keep it round
+                        if (s.bevelSize < 0) s.bevelSize = 0;
+                        s.bevelSegments = 8; // Reduced segments
+                        s.realisticMaterial = { roughness: 0.3, metalness: 0 };
+                        series.push(s);
+                    }
+                } else if (shape === 'pyramid') {
+                    // Optimized Pyramid: Stacked layers (Reduced count for performance)
+                    var layers = 6; // Reduced from 20 to 6 to prevent WebGL crash
+                    var maxBarSize = 3.0;
+                    for (var j = 0; j < layers; j++) {
+                        var ratio = (j + 1) / layers;
+                        var hScale = ratio;
+                        var bSize = maxBarSize * (1 - (j / layers));
+                        if (bSize < 0.1) bSize = 0.1;
+                        
+                        var s = makeBarLayer((rawData.visualMapName || '数据') + '_pyramid_' + j, bSize, hScale, 10 + j);
+                        s.shading = 'realistic';
+                        s.bevelSize = 0; // Square edges
+                        s.realisticMaterial = { roughness: 0.3, metalness: 0 };
+                        series.push(s);
+                    }
+                } else if (shape === 'prism') {
+                    // Prism (Triangular Prism approximation or Distinct Shape)
+                    // Using "Chamfered Box" (Octagonal Prism) to distinguish from Cuboid
+                    var sP = makeBarLayer((rawData.visualMapName || '数据') + '_prism', 3.0, 1, 10);
+                    sP.shading = 'realistic';
+                    sP.bevelSize = 1.0; 
+                    sP.bevelSegments = 1; // Faceted look
+                    sP.realisticMaterial = { roughness: 0.3, metalness: 0 };
+                    series.push(sP);
+                } else {
+                    // Default Cuboid
+                    series.push({
+                        type: 'bar3D', coordinateSystem: 'geo3D', shading: 'lambert', zlevel: 10,
+                        data: data.map(function(item) { 
+                            if (getShortName(item.name) === '南海诸岛' || getShortName(item.name) === '九段线') return null;
+                            var coord = geoCoordMap[item.name] || geoCoordMap[getShortName(item.name)]; 
+                            return coord ? { name: item.name, value: [coord[0], coord[1], item.value] } : null; 
+                        }).filter(function(i){return i}),
+                        barSize: 2, minHeight: 2, sleep: true,
+                        itemStyle: { color: function(params) { return getColor(params.value[2]); } }
+                    });
+                }
+                
+                // Add the independent label series
+                return series.concat(getScatter3DLabelSeries(data));
+            }
+
+            function getScatter3DLabelSeries(data) {
+                var scatterData = [];
+                var zLift = 1;
+                if (config.visualizationType === 'gradient') zLift = 2;
+                if (data) {
+                    data.forEach(function(item) {
+                        if (!item || !item.name) return;
+                        
+                        // Strict whitelist filtering
+                        if (!isAllowedRegion(item.name)) return;
+                        
+                        var shortName = getShortName(item.name);
+                        // Double check against residue points
+                        if (shouldUseChinaWhitelist() && (shortName === '南海诸岛' || shortName === '九段线' || shortName === '十段线')) return;
+                        
+                        var coord = geoCoordMap[item.name] || geoCoordMap[shortName];
+                        if (coord) {
+                            var val = (item.value !== undefined && item.value !== null) ? item.value : '';
+                            var z = zLift;
+                            if (config.visualizationType === 'bar3d') {
+                                z = (Number(val) || 0) + 2;
+                            }
+                            scatterData.push({ 
+                                name: item.name, 
+                                shortName: shortName,
+                                value: [coord[0], coord[1], z, val]
+                            });
+                        }
+                    });
+                }
+                
+                if (scatterData.length === 0) return [];
+
+                function parseHexColor(hex) {
+                    if (!hex) return null;
+                    var s = (hex + '').trim();
+                    if (s.indexOf('#') !== 0) return null;
+                    s = s.slice(1);
+                    if (s.length === 3) {
+                        s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+                    }
+                    if (s.length !== 6) return null;
+                    var r = parseInt(s.slice(0, 2), 16);
+                    var g = parseInt(s.slice(2, 4), 16);
+                    var b = parseInt(s.slice(4, 6), 16);
+                    if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+                    return { r: r, g: g, b: b };
+                }
+
+                function getOutlineColor() {
+                    var bg = parseHexColor(config.backgroundColor);
+                    if (!bg) return 'rgba(0,0,0,0.75)';
+                    var luminance = (0.2126 * bg.r + 0.7152 * bg.g + 0.0722 * bg.b) / 255;
+                    return luminance < 0.5 ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)';
+                }
+
+                var outlineColor = getOutlineColor();
+                var fontSize = config.labelSize || 12;
+
+                return [{
+                    type: 'scatter3D',
+                    coordinateSystem: 'geo3D',
+                    symbol: 'circle',
+                    symbolSize: 1, 
+                    label: {
+                        show: config.showLabel,
+                        position: (config.visualizationType === 'bar3d') ? 'top' : 'inside',
+                        distance: (config.visualizationType === 'bar3d') ? 6 : 0,
+                        align: 'center',
+                        verticalAlign: 'middle',
+                        textAlign: 'center',
+                        textVerticalAlign: 'middle',
+                        color: config.labelColor || config.fontColor || '#333',
+                        fontSize: fontSize,
+                        fontWeight: (config.visualizationType === 'gradient' || config.visualizationType === 'bar3d') ? 'normal' : 'bold',
+                        backgroundColor: 'transparent',
+                        padding: 0,
+                        lineHeight: Math.round(fontSize * 1.3),
+                        textBorderColor: outlineColor,
+                        textBorderWidth: 4,
+                        textShadowColor: outlineColor,
+                        textShadowBlur: 6,
+                        textShadowOffsetX: 0,
+                        textShadowOffsetY: 0,
+                        formatter: function(params) {
+                            var name = '';
+                            var val = '';
+                            
+                            if (params.data) {
+                                // Priority: data.shortName > getShortName(data.name) > getShortName(params.name)
+                                name = params.data.shortName || getShortName(params.data.name || params.name);
+                                if (params.data.value && params.data.value.length > 3) {
+                                    val = params.data.value[3];
+                                }
+                            } else if (params.value && params.value.length > 3) {
+                                name = getShortName(params.name);
+                                val = params.value[3];
+                            }
+                            
+                            // Ensure name is short
+                            name = getShortName(name);
+                            
+                            var valStr = (val !== undefined && val !== null && val !== '') ? '\n' + val : '';
+                            return name + valStr;
+                        }
+                    },
+                    itemStyle: { color: 'rgba(0,0,0,0)', opacity: 1 },
+                    data: scatterData,
+                    silent: true, // No interaction
+                    zlevel: 999999,
+                    z: 999999
+                }];
+            }
+
+            function getGradient3DGeo(data) {
+                data = getFilteredData(data);
+                var regions = [];
+                
+                // Explicitly hide Nanhai/Nine-dash line from 3D map
+                regions.push({ name: '南海诸岛', itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } } });
+                regions.push({ name: '九段线', itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } } });
+                
+                if (data) {
+                    data.forEach(function(item) {
+                        regions.push({ 
+                            name: item.name, 
+                            itemStyle: { color: getColor(item.value), opacity: 1, borderWidth: 0.5, borderColor: config.borderColor }, 
+                            label: { show: false }, // Native label OFF
+                            emphasis: { 
+                                label: { show: false }, 
+                                itemStyle: { areaColor: config.areaHoverColor } 
+                            }
+                        });
+                    });
+                }
+                
+                return {
+                    map: mapType,
+                    roam: true,
+                    itemStyle: { areaColor: config.areaColor, opacity: 1, borderWidth: 0.5, borderColor: config.borderColor },
+                    label: { show: false }, // Global native label OFF
+                    emphasis: { label: { show: false } }, 
+                    shading: 'lambert',
+                    light: { 
+                        main: { intensity: 1.2, shadow: true, alpha: 45, beta: 30 }, 
+                        ambient: { intensity: 0.3 } 
+                    },
+                    viewControl: { 
+                        distance: 100, alpha: 40, beta: 0, 
+                        panMouseButton: 'left', rotateMouseButton: 'right' 
+                    },
+                    regions: regions,
+                    postEffect: { enable: false } // Disable post effects for better performance/clarity if needed
+                };
+            }
+
+            var common = {
+                title: {
+                    text: rawData.title,
+                    subtext: rawData.subtitle,
+                    left: 'center', top: 50,
+                    textStyle: { fontSize: config.fontSize, fontWeight: 'bold', fontFamily: config.fontFamily, color: config.fontColor }
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        var val = params.value;
+                        if (Array.isArray(val)) val = val[2]; // for 3d/scatter
+                        return params.name + '<br/>' + (val || '-') + ' ' + (rawData.subtitle ? rawData.subtitle.replace('单位：', '') : '');
+                    },
+                    textStyle: { fontFamily: config.fontFamily }
+                },
+                graphic: [
+                    config.note ? {
+                        type: 'text', left: 'center', bottom: 20,
+                        style: { text: '备注: ' + config.note, font: '14px ' + config.fontFamily, fill: '#999999', textAlign: 'center' },
+                        z: 100
+                    } : null,
+                    (config.dataSource || config.author) ? {
+                        type: 'text', left: 'center', bottom: config.note ? 45 : 20,
+                        style: { 
+                            text: [config.dataSource ? '数据来源: ' + config.dataSource : '', config.author ? '制图: ' + config.author : ''].filter(function(i){return i}).join('    '), 
+                            font: '14px ' + config.fontFamily, fill: '#999999', textAlign: 'center' 
+                        },
+                        z: 100
+                    } : null
+                ].filter(function(i){return i})
+            };
+
+            var type = config.visualizationType || 'default';
+            
+            // Helper to get data for current time/static
+            function getData(index) {
+                return (rawData.timeline && rawData.data) ? rawData.data[index] : rawData.data;
+            }
+
+            // Helper for map layout and thumbnail
+            function getHiddenRegionsData() {
+                if (mapType === 'china' || mapType === 'china_clean') {
+                    return [
+                        { name: '南海诸岛', value: 0, itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } }, tooltip: { show: false } },
+                        { name: '九段线', value: 0, itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } }, tooltip: { show: false } }
+                    ];
+                }
+                return [];
+            }
+
+            function getMainRegions() {
+                // Main map background styling (if visible)
+                if (mapType === 'china' || mapType === 'china_clean') {
+                    return [
+                        { name: '南海诸岛', itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } } },
+                        { name: '九段线', itemStyle: { opacity: 0 }, label: { show: false }, emphasis: { label: { show: false }, itemStyle: { opacity: 0 } } }
+                    ];
+                }
+                return [];
+            }
+
+            function getMapLayout() {
+                if (mapType === 'china' || mapType === 'china_clean') {
+                    return { 
+                        layoutCenter: ['50%', '55%'], 
+                        layoutSize: '90%',
+                        regions: getMainRegions()
+                    };
+                }
+                return {};
+            }
+
+            // Helper for invisible main geo (for coordinate system use)
+            function getTransparentMapLayout() {
+                if (mapType === 'china' || mapType === 'china_clean') {
+                    return { 
+                        layoutCenter: ['50%', '55%'], 
+                        layoutSize: '90%',
+                        regions: getMainRegions(),
+                        itemStyle: { opacity: 0, borderWidth: 0 },
+                        label: { show: false },
+                        emphasis: { label: { show: false }, itemStyle: { opacity: 0 } }
+                    };
+                }
+                return {};
+            }
+
+            function getThumbnailHiddenRegions() {
+                var provinces = [
+                    '北京市', '天津市', '上海市', '重庆市', '河北省', '山西省', '辽宁省', '吉林省',
+                    '黑龙江省', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省',
+                    '湖北省', '湖南省', '广东省', '海南省', '四川省', '贵州省', '云南省', '陕西省',
+                    '甘肃省', '青海省', '台湾省', '内蒙古自治区', '广西壮族自治区', '西藏自治区',
+                    '宁夏回族自治区', '新疆维吾尔自治区', '香港特别行政区', '澳门特别行政区'
+                ];
+                return provinces.map(function(name) {
+                    return { name: name, itemStyle: { opacity: 0, label: { show: false } }, label: { show: false } };
+                });
+            }
+
+            function getThumbnailGeo() {
+                if (originalMapType === 'china') {
+                    return {
+                        map: originalMapType, // Use original map to keep Nanhai thumbnail intact
+                        z: 100,
+                        right: 20, bottom: 20, height: 120, width: 90,
+                        center: [115, 14], zoom: 2.0, 
+                        layoutCenter: null, layoutSize: null,
+                        label: { show: false },
+                        itemStyle: {
+                            areaColor: '#fff', borderColor: '#333', borderWidth: 1, opacity: 1
+                        },
+                        regions: getThumbnailHiddenRegions().concat([
+                            { 
+                                name: '南海诸岛', 
+                                itemStyle: { areaColor: '#ddd', borderColor: '#999', borderWidth: 0.5, opacity: 1 },
+                                label: { show: false }
+                            },
+                            { 
+                                name: '九段线', 
+                                itemStyle: { borderColor: '#666', borderWidth: 1.5, opacity: 1, borderType: 'dashed' },
+                                label: { show: false }
+                            }
+                        ]),
+                        silent: true
+                    };
+                }
+                return null;
+            }
+
+        // Add Graphic Component for Thumbnail Box
+        if (mapType === 'china' || mapType === 'china_clean') {
+             common.graphic = (common.graphic || []).concat([
+                {
+                    type: 'rect',
+                    z: 99,
+                    right: 20,
+                    bottom: 20,
+                    shape: {
+                        width: 90,
+                        height: 120
+                    },
+                    style: {
+                        fill: '#fff',
+                        stroke: '#333',
+                        lineWidth: 1,
+                        shadowBlur: 5,
+                        shadowColor: 'rgba(0,0,0,0.2)'
+                    }
+                }
+            ]);
+        }
+
+            // Helper to filter data based on whitelist
+            function getFilteredData(data) {
+                if (!data) return [];
+                if (!shouldUseChinaWhitelist()) return data;
+                return data.filter(function(item) {
+                    return isAllowedRegion(item.name);
+                });
+            }
+
+            // --- Visualization Implementations ---
+
+            if (type === 'bar3d') {
+                // VisualMap for Bar3D (Critical for coloring)
+                var visualMap = {
+                    min: 0, max: maxValue, left: 'left', top: 'bottom', text: ['高', '低'], calculable: true,
+                    inRange: { color: config.visualMapColors }, textStyle: { fontFamily: config.fontFamily, color: config.fontColor }
+                };
+
+                // Add 2D Thumbnail to 3D view (Flat Nanhai)
+                var thumbnailGeo = getThumbnailGeo();
+
+                var base = {
+                    title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                    visualMap: visualMap,
+                    geo: thumbnailGeo ? [thumbnailGeo] : [],
+                };
+
+                if (rawData.timeline) {
+                    return {
+                        baseOption: { 
+                            title: base.title, tooltip: base.tooltip, graphic: base.graphic,
+                            visualMap: visualMap,
+                            geo: thumbnailGeo ? [thumbnailGeo] : [],
+                            timeline: { axisType: 'category', autoPlay: true, playInterval: config.playInterval || 2000, data: rawData.timeline } 
+                        },
+                        options: rawData.timeline.map(function(t, i) {
+                            var d = getData(i);
+                            return { 
+                                title: { text: rawData.title + ' (' + t + ')' }, 
+                                geo3D: getBar3DGeo(d),
+                                series: getBar3DSeries(d) 
+                            };
+                        })
+                    };
+                } else {
+                    var d = getData(0);
+                    return { 
+                        title: base.title, tooltip: base.tooltip, graphic: base.graphic,
+                        visualMap: visualMap,
+                        geo: thumbnailGeo ? [thumbnailGeo] : [],
+                        geo3D: getBar3DGeo(d), 
+                        series: getBar3DSeries(d) 
+                    };
+                }
+            }
+
+
+            else if (type === 'ripple') {
+                var visualMap = {
+                    min: 0, max: maxValue, left: 'left', top: 'bottom', text: ['高', '低'], calculable: true,
+                    inRange: { color: config.visualMapColors }, textStyle: { fontFamily: config.fontFamily }
+                };
+                
+                function getRippleSeries(data) {
+                    return [
+                        { type: 'map', geoIndex: 0, roam: true, itemStyle: { areaColor: config.areaColor, borderColor: config.borderColor }, label: { show: false }, data: data },
+                        {
+                            type: 'effectScatter', coordinateSystem: 'geo', geoIndex: 0,
+                            data: data.map(function(item) {
+                                var coord = geoCoordMap[item.name];
+                                if (coord) {
+                                    return { name: item.name, value: [coord[0], coord[1], item.value] };
+                                }
+                                return null;
+                            }).filter(function(i){return i}),
+                            symbolSize: function (val) { return 5 + (val[2] / maxValue) * 15; },
+                            showEffectOn: 'render', rippleEffect: { brushType: 'stroke' }, hoverAnimation: true,
+                            label: { 
+                                show: config.showLabel,
+                                position: 'right', 
+                                formatter: function(params) {
+                                    var name = getShortName(params.name);
+                                    var val = params.value[2];
+                                    return name + (val !== undefined ? '\n' + val : '');
+                                }
+                            },
+                            itemStyle: { shadowBlur: 10, shadowColor: '#333' },
+                            zlevel: 1
+                        }
+                    ];
+                }
+                
+                var rippleGeoLayout = Object.assign({ map: mapType, show: true, roam: true }, getMapLayout(), { itemStyle: { areaColor: config.areaColor, borderColor: config.borderColor } });
+                var rippleGeo = [rippleGeoLayout, getThumbnailGeo()].filter(function(i){return i});
+
+                if (rawData.timeline) {
+                    return {
+                        baseOption: { 
+                            title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                            visualMap: visualMap, geo: rippleGeo, timeline: { axisType: 'category', autoPlay: true, playInterval: config.playInterval || 2000, data: rawData.timeline } 
+                        },
+                        options: rawData.timeline.map(function(t, i) { 
+                            return { title: { text: rawData.title + ' (' + t + ')' }, series: getRippleSeries(getData(i).concat(getHiddenRegionsData())) };
+                        })
+                    };
+                } else {
+                    return { 
+                        title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                        visualMap: visualMap, geo: rippleGeo, series: getRippleSeries(getData(0).concat(getHiddenRegionsData())) 
+                    };
+                }
+            }
+            
+            else if (type === 'glow') {
+                // High-light Glowing Map
+                // Uses multiple geo layers to create glow effect
+                var visualMap = {
+                    min: 0, max: maxValue, left: 'left', top: 'bottom', text: ['高', '低'], calculable: true,
+                    inRange: { color: config.visualMapColors }, textStyle: { fontFamily: config.fontFamily }
+                };
+
+                function getGlowSeries(data) {
+                    var base = Object.assign({ type: 'map', roam: true, map: mapType }, getMapLayout());
+                    var glowColor = (config.borderShadowColor && config.borderShadowColor !== 'transparent') ? config.borderShadowColor : (config.borderColor || config.visualMapColors[config.visualMapColors.length - 1]);
+                    var glowBlur = (config.borderShadowBlur && config.borderShadowBlur > 0) ? config.borderShadowBlur : 15;
+                    return [
+                        // Glow Layer 1 (Shadow)
+                        Object.assign({}, base, {
+                            itemStyle: {
+                                areaColor: 'transparent',
+                                borderColor: glowColor,
+                                borderWidth: 2,
+                                shadowColor: glowColor,
+                                shadowBlur: glowBlur
+                            },
+                            silent: true, data: [],
+                        }),
+                        // Main Data Layer
+                        Object.assign({}, base, {
+                            name: rawData.visualMapName || '数据',
+                            label: { 
+                                show: config.showLabel, 
+                                color: config.labelColor || config.fontColor,
+                                fontSize: config.labelSize || 12,
+                                fontFamily: config.fontFamily,
+                                fontWeight: 'normal',
+                                position: 'inside',
+                                formatter: function(params) {
+                                    var name = getShortName(params.name);
+                                    var val = params.value;
+                                    return name + (val !== undefined && val !== null && val !== '' ? '\n' + val : '');
+                                }
+                            },
+                            labelLayout: { hideOverlap: false, moveOverlap: 'shiftY' },
+                            itemStyle: { borderColor: config.borderColor, areaColor: config.areaColor },
+                            emphasis: { label: { show: config.showLabel, fontWeight: 'normal' }, itemStyle: { areaColor: config.areaHoverColor } },
+                            data: data,
+                        })
+                    ];
+                }
+
+                var defaultGeo = [getThumbnailGeo()].filter(function(i){return i});
+
+                if (rawData.timeline) {
+                    return {
+                        baseOption: { 
+                            title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                            visualMap: visualMap, geo: defaultGeo, timeline: { axisType: 'category', autoPlay: true, playInterval: config.playInterval || 2000, data: rawData.timeline } 
+                        },
+                        options: rawData.timeline.map(function(t, i) { 
+                            return { title: { text: rawData.title + ' (' + t + ')' }, series: getGlowSeries(getData(i).concat(getHiddenRegionsData())) };
+                        })
+                    };
+                } else {
+                    return { 
+                        title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                        visualMap: visualMap, geo: defaultGeo, series: getGlowSeries(getData(0).concat(getHiddenRegionsData())) 
+                    };
+                }
+            }
+
+            else if (type === 'flow') {
+                // Flow Map (Star topology from center)
+                var center = [104.1954, 35.8617]; // China Center
+                
+                // Smart center calculation
+                if (geoCoordMap['北京市']) {
+                    center = geoCoordMap['北京市'];
+                } else {
+                    // Calculate geometric center of all points
+                    var points = [];
+                    for (var key in geoCoordMap) {
+                        if (geoCoordMap.hasOwnProperty(key)) {
+                            points.push(geoCoordMap[key]);
+                        }
+                    }
+                    if (points.length > 0) {
+                        var sumLon = 0, sumLat = 0;
+                        points.forEach(function(p) { sumLon += p[0]; sumLat += p[1]; });
+                        center = [sumLon / points.length, sumLat / points.length];
+                    }
+                }
+                
+                var visualMap = {
+                    min: 0, max: maxValue, left: 'left', top: 'bottom', text: ['高', '低'], calculable: true,
+                    inRange: { color: config.visualMapColors }, textStyle: { fontFamily: config.fontFamily }
+                };
+
+                function getFlowSeries(data) {
+                    var flowData = data.map(function(item) {
+                        var coord = geoCoordMap[item.name];
+                        return coord ? { coords: [center, coord], value: item.value } : null;
+                    }).filter(function(i){return i});
+                    
+                    return [
+                        {
+                            type: 'map', geoIndex: 0, roam: true,
+                            itemStyle: { areaColor: config.areaColor, borderColor: config.borderColor },
+                            label: { show: false }, data: data 
+                        },
+                        {
+                            type: 'lines', zlevel: 2,
+                            effect: { show: true, period: 6, trailLength: 0.7, color: '#fff', symbolSize: 3 },
+                            lineStyle: { normal: { color: config.visualMapColors[0], width: 0, curveness: 0.2 } },
+                            data: flowData
+                        },
+                        {
+                            type: 'lines', zlevel: 3,
+                            symbol: ['none', 'arrow'], symbolSize: 10,
+                            effect: { show: true, period: 6, trailLength: 0, symbol: 'arrow', symbolSize: 5 },
+                            lineStyle: { normal: { width: 1, opacity: 0.6, curveness: 0.2 } }, 
+                            data: flowData
+                        }
+                    ];
+                }
+                
+                var flowGeoLayout = Object.assign({ map: mapType, show: true, roam: true }, getMapLayout(), { itemStyle: { areaColor: config.areaColor, borderColor: config.borderColor } });
+                var flowGeo = [flowGeoLayout, getThumbnailGeo()].filter(function(i){return i});
+
+                if (rawData.timeline) {
+                    return {
+                        baseOption: { 
+                            title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                            visualMap: visualMap, geo: flowGeo, timeline: { axisType: 'category', autoPlay: true, playInterval: config.playInterval || 2000, data: rawData.timeline } 
+                        },
+                        options: rawData.timeline.map(function(t, i) { 
+                            return { title: { text: rawData.title + ' (' + t + ')' }, series: getFlowSeries(getData(i).concat(getHiddenRegionsData())) };
+                        })
+                    };
+                } else {
+                    return { 
+                        title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                        visualMap: visualMap, geo: flowGeo, series: getFlowSeries(getData(0).concat(getHiddenRegionsData())) 
+                    };
+                }
+            }
+            
+            else if (type === 'gradient') {
+                // Stereo Gradient Map (True 3D using geo3D)
+                var visualMap = {
+                    min: 0, max: maxValue, left: 'left', top: 'bottom', text: ['高', '低'], calculable: true,
+                    inRange: { color: config.visualMapColors }, textStyle: { fontFamily: config.fontFamily, color: config.fontColor }
+                };
+
+                // Add 2D Thumbnail to 3D view
+                var thumbnailGeo = getThumbnailGeo();
+                
+                var base = {
+                    title: common.title, tooltip: common.tooltip, graphic: common.graphic,
+                    visualMap: visualMap,
+                    geo: thumbnailGeo ? [thumbnailGeo] : [],
+                };
+
+                if (rawData.timeline) {
+                     return {
+                        baseOption: { 
+                            title: base.title, tooltip: base.tooltip, graphic: base.graphic,
+                            visualMap: visualMap, 
+                            geo: thumbnailGeo ? [thumbnailGeo] : [],
+                            timeline: { axisType: 'category', autoPlay: true, playInterval: config.playInterval || 2000, data: rawData.timeline } 
+                        },
+                        options: rawData.timeline.map(function(t, i) {
+                            var d = getData(i);
+                            return { 
+                                title: { text: rawData.title + ' (' + t + ')' }, 
+                                geo3D: getGradient3DGeo(d),
+                                series: getScatter3DLabelSeries(d)
+                            };
+                        })
+                    };
+                } else {
+                    var d = getData(0);
+                    return { 
+                        title: base.title, tooltip: base.tooltip, graphic: base.graphic,
+                        visualMap: visualMap, 
+                        geo: thumbnailGeo ? [thumbnailGeo] : [],
+                        geo3D: getGradient3DGeo(d),
+                        series: getScatter3DLabelSeries(d)
+                    };
+                }
+            }
+
+
+            // --- Default (Flat Map) ---
+            var visualMapConfig = {
+                min: 0, max: maxValue, left: 'left', top: 'bottom', text: ['高', '低'], calculable: true,
+                inRange: { color: config.visualMapColors }, textStyle: { fontFamily: config.fontFamily }
+            };
+            var itemStyleConfig = {
+                borderColor: config.borderColor, areaColor: config.areaColor,
+                shadowBlur: config.show3D ? 15 : 0, shadowColor: config.show3D ? 'rgba(0, 0, 0, 0.6)' : 'transparent',
+                shadowOffsetX: config.show3D ? 8 : 0, shadowOffsetY: config.show3D ? 8 : 0
+            };
+            
+            function getLabelFormatter(params) {
+                if (!params.name) return '';
+                if (shouldUseChinaWhitelist() && !isAllowedRegion(params.name)) return '';
+                var name = getShortName(params.name);
+                
+                var value = '';
+                if (params.value !== undefined && params.value !== null && !isNaN(params.value)) {
+                    value = '\n' + params.value;
+                } else if (Array.isArray(params.value) && params.value.length > 2) {
+                    value = '\n' + params.value[2];
+                }
+                return name + value;
+            }
+
+            // Only Thumbnail in Geo, Main Map in Series
+            // Use consistent structure: Geo = Thumbnail (masked), Series = Main Map (independent)
+            var defaultGeo = [getThumbnailGeo()].filter(function(i){return i});
+
+            if (rawData.timeline) {
+                var options = rawData.timeline.map(function(t, i) {
+                    return {
+                        title: { text: rawData.title + ' (' + t + ')' },
+                        series: [{ data: rawData.data[i].concat(getHiddenRegionsData()) }]
+                    };
+                });
+                return {
+                    baseOption: {
+                        timeline: { axisType: 'category', autoPlay: true, playInterval: config.playInterval || 2000, data: rawData.timeline, left: '10%', right: '10%', bottom: '2%' },
+                        title: common.title, tooltip: common.tooltip, visualMap: visualMapConfig, graphic: common.graphic,
+                        geo: defaultGeo,
+                        series: [Object.assign({
+                            name: rawData.visualMapName || '数据', type: 'map', roam: true,
+                            map: mapType
+                        }, getMapLayout(), {
+                            labelLayout: { hideOverlap: false, moveOverlap: 'shiftY' },
+                            label: { show: config.showLabel, fontFamily: config.fontFamily, fontSize: config.labelSize || 12, color: config.labelColor || config.fontColor, formatter: getLabelFormatter, align: 'center' },
+                            itemStyle: itemStyleConfig, emphasis: { label: { show: true }, itemStyle: { areaColor: config.areaHoverColor } }
+                        })]
+                    },
+                    options: options
+                };
+            }
+            
+            return {
+                title: common.title, tooltip: common.tooltip, visualMap: visualMapConfig, graphic: common.graphic,
+                geo: defaultGeo,
+                series: [Object.assign({
+                    name: rawData.visualMapName || '数据', type: 'map', roam: true,
+                    map: mapType
+                }, getMapLayout(), {
+                    label: { show: config.showLabel, fontFamily: config.fontFamily, fontSize: config.labelSize, color: config.labelColor, formatter: getLabelFormatter, align: 'center' },
+                    itemStyle: itemStyleConfig, emphasis: { label: { show: true }, itemStyle: { areaColor: config.areaHoverColor } },
+                    data: rawData.data.concat(getHiddenRegionsData())
+                })]
+            };
+        }
+
+        function updateOption() {
+            if (myChart) {
+                myChart.clear(); // Clear to remove previous components if type changed
+                myChart.setOption(getOption());
+            }
+        }
+
+        function updateConfig(newConfig) {
+            Object.assign(config, newConfig);
+            if (newConfig.duration && rawData.timeline && rawData.timeline.length > 1) {
+                config.playInterval = newConfig.duration / (rawData.timeline.length - 1);
+            }
+            applyGlobalStyles();
+            // Re-process data to ensure any new filters (like GeoJSON cleanup) are applied if config changes trigger it
+            // Although GeoJSON filtering is usually one-off, calling this ensures robustness
+            processData(); 
+            updateOption();
+        }
+
+        function applyGlobalStyles() {
+            document.body.style.backgroundColor = config.backgroundColor;
+            var bgLayer = document.getElementById('bg-layer');
+            if (config.backgroundImage) {
+                bgLayer.style.backgroundImage = config.backgroundImage;
+                bgLayer.style.opacity = config.bgOpacity;
+            } else {
+                bgLayer.style.backgroundImage = "none";
+            }
+            document.body.style.fontFamily = config.fontFamily;
+        }
+
+        // === Video Export Support ===
+        window.startSlowMotionAnimation = function(speedRatio) {
+             if (rawData.timeline && myChart) {
+                 var originalInterval = config.playInterval || 2000;
+                 var newInterval = originalInterval / speedRatio;
+                 myChart.setOption({ timeline: { playInterval: newInterval, autoPlay: true } });
+                 myChart.dispatchAction({ type: 'timelineChange', currentIndex: 0 });
+                 return { totalDuration: (rawData.timeline.length) * newInterval + 2000 };
+             }
+             return { totalDuration: 1000 };
+        };
+        
+        window.prepareTimeline = function() {
+             if (myChart && rawData.timeline) {
+                 myChart.dispatchAction({ type: 'timelinePlayChange', playState: false });
+                 myChart.dispatchAction({ type: 'timelineChange', currentIndex: 0 });
+             }
+        };
+    </script>
+</body>
+</html>

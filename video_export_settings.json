@@ -1,0 +1,20 @@
+{
+  "audio": {
+    "enabled": true,
+    "path": "C:/Users/Administrator/Desktop/天堂光芒.mp3"
+  },
+  "watermark": {
+    "enabled": true,
+    "type": "text",
+    "text": "非常英语",
+    "fontSize": 40,
+    "opacity": 0.5,
+    "position": "Bottom Right",
+    "imagePath": ""
+  },
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60
+  }
+}

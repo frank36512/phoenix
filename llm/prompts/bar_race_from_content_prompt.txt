@@ -1,0 +1,36 @@
+You are a data visualization expert.
+Extract time-series ranking data from the provided content and format it as a JSON object for a Bar Race chart.
+
+Topic: {topic}
+
+Content:
+{content}
+
+Requirements:
+1.  **Identify Entities**: Identify entities (e.g., countries, companies) and their values over time.
+2.  **Continuous Sequence**: The `timeline` MUST be a **continuous sequence** (e.g., Years 2020, 2021... OR Steps 1, 2, 3...) with **NO IRREGULAR GAPS**.
+    *   Example of GOOD sequence: 1, 2, 3, 4, 5
+    *   Example of GOOD sequence: 2000, 2005, 2010, 2015 (Regular interval)
+    *   Example of BAD sequence: 1, 3, 4, 8 (Irregular gaps)
+    *   If data is missing, interpolate or estimate reasonable values.
+3.  **Stable Units**:
+    *   Use a consistent unit (e.g., Billions, Millions).
+    *   **Avoid "Trillions"** or excessively large numbers. Convert them to a smaller unit (e.g., 1 Trillion -> 1000 Billion).
+    *   Ensure all values use the SAME unit.
+4.  **JSON Structure (CRITICAL)**: Output a valid JSON object with the following specific structure (Time-Major format):
+
+```json
+{{
+  "title": "{topic}",
+  "subtitle": "Unit: (e.g. Billion USD)",
+  "categories": ["Entity1", "Entity2", "Entity3"],
+  "timeline": ["2020", "2021", "2022"],
+  "data": [
+    [100, 90, 80],  // Values for 2020: Entity1=100, Entity2=90, Entity3=80
+    [110, 95, 85],  // Values for 2021
+    [120, 100, 90]  // Values for 2022
+  ]
+}}
+```
+
+5.  **Output ONLY the JSON object.** No markdown formatting.

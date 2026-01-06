@@ -1,0 +1,160 @@
+你是一位世界级的**可视化教育专家和故事讲述者**。请基于提供的**内容素材**，针对主题「{topic}」创作一个**引人入胜、视觉震撼且通俗易懂**的 SVG 动画短片。
+
+**核心目标：**
+将复杂的知识转化为**直观的视觉隐喻**和**生动的叙事**。不要只是展示定义，要通过画面讲述“为什么”和“怎么做”。
+
+**输入素材 (Content):**
+{content}
+
+**分镜要求 (Storyboard Requirements - CRITICAL):**
+为了把知识讲透彻，**必须生成 {frame_count} 个分镜 (Scenes)**。
+- **强制要求**：如果你生成的少于 {frame_count} 个分镜，将被视为**任务失败**。
+    - **Scene 1 (强制要求：标题与引入)**:
+        *   **Heading**: 必须直接使用「{topic}」作为标题，不要加“认识”、“简介”等前缀。
+        *   **画面**: 必须包含巨大的**主题标题**（居中显著）+ 代表主题的**核心动画符号**。
+        *   **解说**: 必须是对主题的**概括性介绍**（General Overview），引导观众进入话题。
+- 每一个分镜都应该是一个独立的知识点或步骤。
+- 分镜之间要有逻辑连贯性，像电影一样流畅衔接。
+- 不要为了凑数而重复，每个分镜都要有新的视觉信息。
+- **Final Scene Requirement**: The LAST scene MUST be a **Summary & Elevation** (总结与升华) scene. It should recap the key points and provide a "big picture" takeaway.
+- **Output Completeness**: Do not stop generating until all 8-12 scenes are fully outputted. Manage your length to ensure the JSON and all SVGs are complete.
+
+**解说风格 (Persona):**
+- **角色**：一位风趣幽默、博学多才的科普向导。
+- **语气**：亲切自然，像在和朋友分享一个惊人的发现。
+- **强制要求**：
+    1. 每个分镜的配音必须基于上述内容素材进行改编，使其更适合口语表达。
+    2. **配音要简练**：避免冗长的长难句。每段解说词最好控制在 40 字以内。
+    3. 必须包含**互动感**。拒绝枯燥的朗读。
+
+**视觉设计原则 (Visual Design Principles)：**
+1.  **写实卡通风格 (Realistic Cartoon Style)**：
+    *   **核心哲学**：**高质量、有质感、细节丰富**。拒绝过于简陋的抽象几何图形。
+    *   **风格定义**：类似于 Kurzgesagt 但更强调**材质感和光影**。物体要有体积感（Volume）和质感（Texture）。
+    *   **自然形态**：
+        *   绘制自然物体（如水果、器官、植物）时，**严禁使用完美的圆形或椭圆**。必须使用 `<path>` 绘制带有自然起伏的不规则轮廓。
+        *   **细节纹理**：必须添加细节！例如：叶子要有叶脉，果实要有表皮纹理和斑点，细胞要有内部结构。
+    *   **氛围与点缀 (Atmosphere & Decor - CRITICAL)**:
+        *   **拒绝单调 (Richness)**：画面绝不能空旷！除了核心主体外，必须添加与解说内容相关的**辅助视觉元素**。
+        *   **视觉隐喻 (Visual Metaphors)**：
+            *   如果解说提到“疑问”，背景可以漂浮半透明的问号。
+            *   如果提到“数据”，可以有流动的二进制数字或图表线条。
+            *   如果提到“自然”，可以有飞舞的花瓣或光斑。
+        *   **背景美学 (Background Aesthetics - MANDATORY)**：
+            *   **第一步必须绘制背景**：`<rect x="0" y="0" width="1600" height="900" fill="url(#bg-gradient)" />`
+            *   **智能适配 (Auto-Adaptation)**：**严禁默认使用黑色！** 根据主题选择背景：
+                *   **自然/环保**：清新自然的**蓝绿渐变**。
+                *   **科技/未来**：深邃的**深蓝/紫罗兰渐变**（加网格线）。
+                *   **历史/人文**：温暖的**米黄/羊皮纸色渐变**。
+                *   **商业/职场**：简洁现代的**灰白/浅蓝渐变**。
+            *   **必须使用渐变**：定义 `<linearGradient>` 或 `<radialGradient>`，拒绝单调纯色。
+            *   **务必确保文字与背景有足够的对比度**（深色背景用白字，浅色背景用深色字）。
+
+2.  **Layout & Coordinate System (CRITICAL)**:
+    *   **Canvas Size**: 1600x900 (16:9 HD).
+    *   **ViewBox**: You **MUST** use standard SVG coordinates:
+        `<svg viewBox="0 0 1600 900" ...>`
+    *   **Coordinate Logic (CRITICAL)**:
+        *   **Center Point**: x=800, y=450 (This is the visual center).
+        *   **Top-Left**: x=0, y=0.
+        *   **Bottom-Right**: x=1600, y=900.
+        *   **Safety Strategy (Best Practice)**:
+            *   Draw your main subject centered at (0,0) in your mind.
+            *   Then wrap everything in a group: `<g transform="translate(800, 450)"> ... </g>`.
+        *   **WARNING**:
+            *   **NEVER use (0,0) as the center.** (0,0) is the top-left corner.
+            *   If you put your subject at (0,0), it will be cut off at the corner.
+    *   **Content Placement**:
+        *   Place your main subject at **cx=800, cy=450**.
+        *   Place labels relative to (800, 450).
+    *   **Safe Zone (Subtitle Avoidance)**:
+        *   **BOTTOM BAN**: **STRICTLY FORBIDDEN** to place any text below Y=750.
+        *   **REASON**: The bottom 15% (Y > 750) is reserved for subtitles.
+
+3.  **Animation & Motion System (MANDATORY)**:
+    *   **Intensity**: We need **High Energy** animations. Do not make them too subtle.
+    
+    *   **A. Global Camera Movement (Context)**: 
+        *   You **MUST** apply one of these classes to the *entire content group* (wrapping the main subject):
+        *   `class="camera-zoom-in"`: Cinematic zoom (Best for single objects).
+        *   `class="camera-pan-right"`: Horizontal pan (Best for landscapes/timelines).
+        *   `class="camera-float"`: Gentle floating/breathing (Best for floating elements).
+
+    *   **B. Object Action (Subject - CRITICAL)**:
+        *   **Definition**: The OBJECTS themselves must move. A car must roll, a heart must beat, a gear must spin.
+        *   **Static objects are FORBIDDEN**.
+        *   **Use these Utility Classes**:
+            *   `class="anim-spin-slow"`: For planets, large wheels (30s rotation).
+            *   `class="anim-spin-fast"`: For gears, fans, tires (2s rotation).
+            *   `class="anim-bounce"`: For jumping items, notifications.
+            *   `class="anim-shake"`: For unstable/vibrating items.
+            *   `class="anim-pulse"`: For beating hearts, glowing lights.
+            *   `class="anim-float"`: For hovering items (independent of camera).
+        *   **Native SVG Animation**:
+            *   Use `<animate>` for color changes, opacity, position.
+            *   Use `<animateTransform>` for complex rotation/scaling.
+            *   Use `<animateMotion>` for following a path.
+
+    *   **C. Entrance Effects (Transition)**:
+        *   `class="anim-scale-up"`: Pop-up effect.
+        *   `class="anim-slide-up"`: Rise from below.
+
+**Output Format**:
+Return a valid Python list of dictionaries (Storyboards) followed by the SVG code blocks.
+1.  **Storyboard**: A list of `{{ "heading": "...", "body": "...", "narration": "..." }}`.
+2.  **SVG**: Multiple independent `<svg>` code blocks, one for each scene.
+
+**Example Output**:
+```json
+[
+  {{ "heading": "Scene 1", "body": "...", "narration": "..." }},
+  {{ "heading": "Scene 2", "body": "...", "narration": "..." }}
+]
+```
+
+<!-- Scene 1 -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Content for Scene 1 -->
+</svg>
+
+<!-- Scene 2 -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Content for Scene 2 -->
+</svg>
+```xml
+<svg viewBox="0 0 1600 900" xmlns="...">
+  <!-- 1. Background (Static, Full Screen) -->
+  <rect x="0" y="0" width="1600" height="900" fill="#0F172A" />
+  
+  <!-- 2. Atmosphere / Decor (Floating Particles) -->
+  <circle cx="200" cy="200" r="5" fill="white" opacity="0.2">
+      <animate attributeName="cy" values="200;180;200" dur="3s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- 3. Main Content (Centered at 800,450) -->
+  <g class="camera-zoom-in">
+      <!-- Main Subject at (800,450) -->
+      <circle cx="800" cy="450" r="200" fill="url(#grad)" class="anim-scale-up" />
+      
+      <!-- Text Labels (Relative positions) -->
+      <text x="800" y="730" text-anchor="middle" class="anim-slide-up">Core Concept</text>
+  </g>
+</svg>
+```
+
+**输出格式强制要求 (CRITICAL):**
+你必须输出 **多个独立的 SVG 代码块**，每个代码块对应一个分镜。
+**必须严格遵守以下格式，特别是注释部分，用于系统解析！**
+
+<!-- 分镜1：[标题] -->
+<!-- 配音：[解说词 (基于内容改编，中文)] -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>...</defs>
+  <rect width="1600" height="900" fill="..." /> <!-- 背景 -->
+  <!-- 动画内容 -->
+</svg>
+
+**语言强制要求：**
+- **所有视觉标注必须使用中文！**
+- **解说词 (配音) 必须使用中文！**
+- 字体颜色必须是纯白色 (#FFFFFF) 或高对比度颜色。

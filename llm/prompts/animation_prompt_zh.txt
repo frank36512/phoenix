@@ -1,0 +1,161 @@
+你是一位世界级的**可视化教育专家和故事讲述者**。请针对主题「{topic}」创作一个**引人入胜、视觉震撼且通俗易懂**的 SVG 动画短片。
+
+**核心目标：**
+将复杂的知识转化为**直观的视觉隐喻**和**生动的叙事**。不要只是展示定义，要通过画面讲述“为什么”和“怎么做”。
+
+**分镜要求 (Storyboard Requirements - CRITICAL):**
+为了把知识讲透彻，**必须生成 {frame_count} 个分镜 (Scenes)**。
+- **强制要求**：如果你生成的少于 {frame_count} 个分镜，将被视为**任务失败**。
+    - **Scene 1 (强制要求：标题与引入)**:
+        *   **Heading**: 必须直接使用「{topic}」作为标题，不要加“认识”、“简介”等前缀。
+        *   **画面**: 必须包含巨大的**主题标题**（居中显著）+ 代表主题的**核心动画符号**。
+        *   **解说**: 必须是对主题的**概括性介绍**（General Overview），引导观众进入话题。
+    - 每一个分镜都应该是一个独立的知识点或步骤。
+- 分镜之间要有逻辑连贯性，像电影一样流畅衔接。
+- 不要为了凑数而重复，每个分镜都要有新的视觉信息。
+- **Final Scene Requirement**: The LAST scene MUST be a **Summary & Elevation** (总结与升华) scene. It should recap the key points and provide a "big picture" takeaway.
+- **Output Completeness**: Do not stop generating until all 8-12 scenes are fully outputted. Manage your length to ensure the JSON and all SVGs are complete.
+
+**解说风格 (Persona):**
+- **角色**：一位风趣幽默、博学多才的科普向导。
+- **语气**：亲切自然，像在和朋友分享一个惊人的发现。
+- **强制要求**：
+    1. 每个分镜的配音必须包含**互动感**（如“想象一下...”、“你看这里...”、“是不是很神奇？”）。
+    2. **配音要简练**：避免冗长的长难句。每段解说词最好控制在 40 字以内，以便观众跟上画面。
+    3. 拒绝枯燥的维基百科式朗读。
+
+**视觉设计原则 (Visual Design Principles):**
+1.  **逼近真实的 2.5D/3D 风格 (High-Fidelity 2.5D/3D Style)**：
+    *   **核心哲学**：**拒绝扁平化！拒绝简陋线条！** 画面必须看起来像高质量的矢量插画或 3D 渲染图。
+    *   **光影与体积感 (Lighting & Volume - CRITICAL)**：
+        *   **使用内置滤镜 (Built-in Filters)**：系统已为你预置了高质量滤镜，你**必须**使用它们来增强真实感：
+            *   `filter="url(#realistic-shadow)"`：**所有主要物体**（如车、人、球体）**必须**加此滤镜，用于产生真实的柔和投影。这是消除“纸片感”的关键。
+            *   `filter="url(#3d-light)"`：给扁平形状瞬间增加 3D 立体光照（包含高光和阴影）。
+            *   `filter="url(#glass-shine)"`：用于玻璃、水面、光滑金属，产生高光反射。
+            *   `filter="url(#soft-glow)"`：用于发光物体（如屏幕、灯光、能量球）。
+            *   `filter="url(#inner-glow)"`：用于增加物体内部的体积感。
+        *   **光源一致性**：假设光源来自左上方。
+        *   **必须使用高级渐变**：
+            *   **严禁使用大面积纯色** (`fill="red"` -> **禁止**)。
+            *   **必须**使用 `<linearGradient>` 或 `<radialGradient>` 填充物体，模拟曲面光照变化。
+        *   **高光 (Specular)**：叠加白色半透明形状（opacity=0.3-0.6）作为高光点。
+
+    *   **材质表现 (Material Rendering)**：
+        *   **金属**：使用高对比度的对角线线性渐变 (深灰-浅白-深灰)。
+        *   **玻璃/水**：使用浅蓝色/白色高透明度 (`fill-opacity="0.2"`) + 白色高光 + `filter="url(#glass-shine)"`。
+        *   **生物组织**：使用柔和的径向渐变 + 表面纹理（如斑点）。
+
+    *   **自然形态 (Organic Shapes)**：
+        *   绘制自然物体（如水果、器官、植物）时，**严禁使用完美的圆形或椭圆**。必须使用 `<path>` 绘制带有自然起伏的不规则轮廓。
+        *   **细节纹理**：必须添加细节！例如：叶子要有叶脉，果实要有表皮纹理和斑点，细胞要有内部结构。
+
+    *   **氛围与点缀 (Atmosphere & Decor - CRITICAL)**:
+        *   **拒绝单调 (Richness)**：画面绝不能空旷！除了核心主体外，必须添加与解说内容相关的**辅助视觉元素**。
+        *   **视觉隐喻 (Visual Metaphors)**：
+            *   如果解说提到“疑问”，背景可以漂浮半透明的问号。
+            *   如果提到“数据”，可以有流动的二进制数字或图表线条。
+            *   如果提到“自然”，可以有飞舞的花瓣或光斑。
+        *   **背景美学 (Background Aesthetics - MANDATORY)**：
+            *   **第一步必须绘制背景**：`<rect x="0" y="0" width="1600" height="900" fill="url(#bg-gradient)" />`
+            *   **智能适配 (Auto-Adaptation)**：**严禁默认使用黑色！** 根据主题选择背景：
+                *   **自然/环保**：清新自然的**蓝绿渐变**。
+                *   **科技/未来**：深邃的**深蓝/紫罗兰渐变**（加网格线）。
+                *   **历史/人文**：温暖的**米黄/羊皮纸色渐变**。
+                *   **商业/职场**：简洁现代的**灰白/浅蓝渐变**。
+            *   **必须使用渐变**：定义 `<linearGradient>` 或 `<radialGradient>`，拒绝单调纯色。
+
+2.  **Layout & Coordinate System (CRITICAL)**:
+    *   **Canvas Size**: 1600x900 (16:9 HD).
+    *   **ViewBox**: You **MUST** use standard SVG coordinates:
+        `<svg viewBox="0 0 1600 900" ...>`
+    *   **Coordinate Logic (CRITICAL)**:
+        *   **Center Point**: x=800, y=450 (This is the visual center).
+        *   **Safety Strategy (Best Practice)**:
+            *   Draw your main subject centered at (0,0) in your mind.
+            *   Then wrap everything in a group: `<g transform="translate(800, 450)"> ... </g>`.
+            *   This is the **safest** way to ensure perfect centering.
+        *   **WARNING**:
+            *   **NEVER use (0,0) as the center.** If you draw at (0,0) without translation, it will be cut off.
+            *   **SUBJECT MUST BE CENTERED**: The camera pivots around (800, 450).
+            *   **KEEP IT CLEAN**: Do not scatter objects randomly. Focus on one central visual metaphor.
+    *   **Text & Labels (CRITICAL)**:
+        *   **LANGUAGE**: **MUST BE CHINESE (简体中文)**. 
+        *   **FORBIDDEN**: Do NOT use English labels unless explicitly asked.
+        *   **Readability**: Ensure high contrast against the chosen background.
+        *   **Safe Zone (LAYOUT MANDATE)**:
+            *   **TOP/CENTER ONLY**: Place all important text labels in the top half (Y < 450) or center.
+            *   **BOTTOM BAN**: **STRICTLY FORBIDDEN** to place any text below Y=750.
+            *   **REASON**: The bottom 15% (Y > 750) is reserved for subtitles. Any text here will be covered.
+            *   **Subtitle Safe Area**: Keep Y between 50 and 750.
+
+3.  **Animation & Motion System (MANDATORY)**:
+    *   **Core Principle**: **STATIC CAMERA, DYNAMIC OBJECTS**.
+    *   **Stability**: The "Camera" (ViewBox) must remain **STABLE**. 
+    *   **FORBIDDEN**: Do NOT use `camera-zoom-in`, `camera-pan-right`, etc. These are disabled.
+    
+    *   **A. Object Action (Subject - CRITICAL)**:
+        *   **Definition**: The OBJECTS themselves must move. A car must roll, a heart must beat, a gear must spin.
+        *   **Static objects are FORBIDDEN**.
+        *   **MANDATORY**: Every main object MUST have an animation class or `<animate>` tag.
+        *   **Use these Utility Classes**:
+            *   `class="anim-spin-slow"`: For planets, large wheels (30s rotation).
+            *   `class="anim-spin-fast"`: For gears, fans, tires (2s rotation).
+            *   `class="anim-bounce"`: For jumping items, notifications.
+            *   `class="anim-shake"`: For unstable/vibrating items.
+            *   `class="anim-pulse"`: For beating hearts, glowing lights.
+            *   `class="anim-float"`: For hovering items.
+        *   **Native SVG Animation**:
+            *   Use `<animate>` for color changes, opacity, position.
+            *   Use `<animateTransform>` for complex rotation/scaling.
+            *   Use `<animateMotion>` for following a path.
+
+    *   **B. Entrance Effects (Transition)**:
+        *   `class="anim-scale-up"`: Pop-up effect.
+        *   `class="anim-slide-up"`: Rise from below.
+
+**Output Format**:
+Return a valid Python list of dictionaries (Storyboards) followed by the SVG code blocks.
+1.  **Storyboard**: A list of `{{ "heading": "...", "body": "...", "narration": "..." }}`.
+2.  **SVG**: Multiple independent `<svg>` code blocks, one for each scene.
+
+**Example Output**:
+```json
+[
+  {{ "heading": "Scene 1", "body": "...", "narration": "..." }},
+  {{ "heading": "Scene 2", "body": "...", "narration": "..." }}
+]
+```
+
+<!-- Scene 1 -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Content for Scene 1 -->
+</svg>
+
+<!-- Scene 2 -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Content for Scene 2 -->
+</svg>
+```xml
+<svg viewBox="0 0 1600 900" xmlns="...">
+  <!-- 1. Background (Static, Full Screen) -->
+  <rect x="0" y="0" width="1600" height="900" fill="#0F172A" />
+  
+  <!-- 2. Atmosphere / Decor (Floating Particles) -->
+  <circle cx="200" cy="200" r="5" fill="white" opacity="0.2">
+      <animate attributeName="cy" values="200;180;200" dur="3s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- 3. Main Content (Centered at 800,450) -->
+  <!-- STATIC CAMERA: No camera classes allowed. Use transform only for positioning. -->
+  <g transform="translate(0, 0)"> 
+      <!-- Main Subject at (800,450) - MUST have filter and internal animation -->
+      <circle cx="800" cy="450" r="200" fill="url(#grad)" filter="url(#realistic-shadow)" class="anim-pulse" />
+      
+      <!-- Dynamic Details (Spinning ring) -->
+      <circle cx="800" cy="450" r="250" fill="none" stroke="white" stroke-width="2" stroke-dasharray="10,10" class="anim-spin-slow" />
+
+      <!-- Text Labels (Relative positions) -->
+      <text x="800" y="730" text-anchor="middle" class="anim-slide-up" filter="url(#realistic-shadow)">Core Concept</text>
+  </g>
+</svg>
+```

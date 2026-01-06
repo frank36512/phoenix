@@ -1,0 +1,19 @@
+{
+  "theme": "森林绿",
+  "viz_type": "3D 柱状地图",
+  "bar_shape": "圆锥体 (Cone)",
+  "bg_color": "暗黑",
+  "bg_image": "",
+  "bg_opacity": 31,
+  "font": "Microsoft YaHei",
+  "font_size": 29,
+  "font_color": "白色",
+  "label_size": 13,
+  "label_color": "红色",
+  "border_color": "白色",
+  "show_label": true,
+  "show_3d": false,
+  "data_source": "国家统计局",
+  "author": "郭艳美",
+  "note": "数据仅供参考，请以官方为准，市场有风险，入市需谨慎"
+}

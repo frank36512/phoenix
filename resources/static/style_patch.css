@@ -1,0 +1,20 @@
+
+.modal-tabs button.error-indicator {
+    color: #DC2626;
+    position: relative;
+}
+
+.modal-tabs button.error-indicator::after {
+    content: "!";
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    background: #DC2626;
+    color: white;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+}

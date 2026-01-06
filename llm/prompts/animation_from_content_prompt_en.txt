@@ -1,0 +1,148 @@
+You are a world-class **visual education expert and storyteller**. Please create an **engaging, visually stunning, and easy-to-understand** SVG animation short film based on the provided **Content**, focusing on the topic "{topic}".
+
+**Core Goal:**
+Transform complex knowledge into **intuitive visual metaphors** and **vivid storytelling**. Don't just show definitions; use visuals to explain "why" and "how".
+
+**Input Content:**
+{content}
+
+**Storyboard Requirements (CRITICAL):**
+To explain the knowledge thoroughly, you **MUST generate {frame_count} Scenes**.
+- **MANDATORY**: Generating fewer than {frame_count} scenes is considered a **FAILURE**.
+- Each scene should represent an independent concept or step.
+- Scenes must be logically connected, flowing smoothly like a movie.
+- Do not repeat content just to fill the count; each scene must have new visual information.
+- **Final Scene Requirement**: The LAST scene MUST be a **Summary & Elevation** scene. It should recap the key points and provide a "big picture" takeaway.
+- **Static scenes are FORBIDDEN.** If a scene has no movement, it is a failure.
+
+**Persona:**
+- **Role**: A witty and knowledgeable science guide.
+- **Tone**: Friendly and natural, like sharing an amazing discovery with a friend.
+- **Mandatory Requirements**:
+    1. The voiceover for each scene must be adapted from the content to be conversational and include **interactivity** (e.g., "Imagine this...", "Look here...").
+    2. **Concise Voiceover**: Avoid long, complex sentences. Each segment should be under 40 words.
+    3. No dry Wikipedia-style reading.
+
+**Visual Design Principles:**
+1.  **Realistic Cartoon Style**:
+    *   **Core Philosophy**: **High Quality, Textured, Rich Details**. Reject overly simple abstract geometric shapes.
+    *   **Style Definition**: Similar to Kurzgesagt but emphasizing **Material and Lighting**. Objects must have Volume and Texture.
+    *   **Natural Forms**:
+        *   When drawing natural objects (fruits, organs, plants), **NEVER use perfect circles or ellipses**. You MUST use `<path>` to draw irregular contours with natural fluctuations.
+        *   **Detailed Textures**: Details are mandatory! E.g., leaves need veins, fruits need skin textures/spots, cells need internal structures.
+    *   **Lighting & Color**:
+        *   **Background Aesthetics**: **Reject the cliché all-black background!** Choose a background color based on the theme.
+            *   **Nature/Outdoors**: Use sky blue (`#87CEEB`), light green, or soft gradients.
+            *   **Humanities/History**: Use beige (`#F5F5DC`), paper textures.
+            *   **Tech/Space**: Use deep blue (`#0F172A`) or black.
+            *   **Contrast**: Ensure text and background have sufficient contrast (White text on dark bg, Dark text on light bg).
+        *   **Advanced Gradients**: **Solid color fills are FORBIDDEN for main subjects**. Use `radialGradient` or `linearGradient` to simulate lighting (Light -> Dark).
+        *   **Highlights**: Add highlights (white semi-transparent) to represent material gloss (waxiness, moisture).
+        *   **Rim Light**: Add faint rim light at edges to increase 3D volume.
+        *   **Shadows**: Objects must have drop shadows at the bottom and occlusion shadows inside.
+
+2.  **Layout & Coordinate System (CRITICAL)**:
+    *   **Canvas & ViewBox**: You **MUST** use the **Standard SVG Coordinate System**:
+        `<svg viewBox="0 0 1600 900" ...>`
+    *   **Coordinate Logic**:
+        *   **(0, 0)** is the **Top-Left** corner.
+        *   **(800, 450)** is the **CENTER** of the screen.
+        *   **WARNING**: Do NOT use (0,0) as the center! This will cause your subject to be cut off at the top-left corner.
+    *   **Background (Mandatory Step 1)**:
+        *   You MUST draw the background rectangle FIRST, covering the full area:
+        *   `<rect x="0" y="0" width="1600" height="900" fill="..." />`
+    *   **Content Placement**:
+        *   Place your main subject at **(800, 450)** (Center).
+        *   Place labels relative to the center (e.g., `y="700"` for text below subject).
+    *   **Safe Zone**:
+        *   Keep text within x=[100, 1500], y=[50, 850] to avoid edge cutting.
+
+3.  **Animation & Motion System (MANDATORY)**:
+    *   **Intensity**: We need **High Energy** animations. Do not make them too subtle.
+    
+    *   **A. Global Camera Movement (Context)**: 
+        *   You **MUST** apply one of these classes to the *entire content group* (wrapping the main subject):
+        *   `class="camera-zoom-in"`: Cinematic zoom (Best for single objects).
+        *   `class="camera-pan-right"`: Horizontal pan (Best for landscapes/timelines).
+        *   `class="camera-float"`: Gentle floating/breathing (Best for floating elements).
+
+    *   **B. Object Action (Subject - CRITICAL)**:
+        *   **Definition**: The OBJECTS themselves must move. A car must roll, a heart must beat, a gear must spin.
+        *   **Static objects are FORBIDDEN**.
+        *   **Use these Utility Classes**:
+            *   `class="anim-spin-slow"`: For planets, large wheels (30s rotation).
+            *   `class="anim-spin-fast"`: For gears, fans, tires (2s rotation).
+            *   `class="anim-bounce"`: For jumping items, notifications.
+            *   `class="anim-shake"`: For unstable/vibrating items.
+            *   `class="anim-pulse"`: For beating hearts, glowing lights.
+            *   `class="anim-float"`: For hovering items (independent of camera).
+        *   **Native SVG Animation**:
+            *   Use `<animate>` for color changes, opacity, position.
+            *   Use `<animateTransform>` for complex rotation/scaling.
+            *   Use `<animateMotion>` for following a path.
+
+    *   **C. Entrance Effects (Transition)**:
+        *   `class="anim-scale-up"`: Pop-up effect.
+        *   `class="anim-slide-up"`: Rise from below.
+
+**Output Format**:
+Return a valid Python list of dictionaries (Storyboards) followed by the SVG code blocks.
+1.  **Storyboard**: A list of `{{ "heading": "...", "body": "...", "narration": "..." }}`.
+2.  **SVG**: Multiple independent `<svg>` code blocks, one for each scene.
+
+**Example Output**:
+```json
+[
+  {{ "heading": "Scene 1", "body": "...", "narration": "..." }},
+  {{ "heading": "Scene 2", "body": "...", "narration": "..." }}
+]
+```
+
+<!-- Scene 1 -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Content for Scene 1 -->
+</svg>
+
+<!-- Scene 2 -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Content for Scene 2 -->
+</svg>
+```xml
+<svg viewBox="0 0 1600 900" xmlns="...">
+  <!-- 1. Background (Static, Full Screen) -->
+  <rect x="0" y="0" width="1600" height="900" fill="#0F172A" />
+  
+  <!-- 2. Atmosphere / Decor (Floating Particles) -->
+  <circle cx="200" cy="200" r="5" fill="white" opacity="0.2">
+      <animate attributeName="cy" values="200;180;200" dur="3s" repeatCount="indefinite" />
+  </circle>
+
+  <!-- 3. Main Content (Centered at 800,450) -->
+  <g class="camera-zoom-in">
+      <!-- Main Subject at (800,450) -->
+      <circle cx="800" cy="450" r="200" fill="url(#grad)" class="anim-scale-up" />
+      
+      <!-- Text Labels (Relative positions) -->
+      <text x="800" y="730" text-anchor="middle" class="anim-slide-up">Core Concept</text>
+  </g>
+</svg>
+```
+
+**Output Format Requirement:**
+You MUST output **multiple independent SVG code blocks**, one for each scene.
+Format as follows:
+
+<!-- Scene 1: [Title] -->
+<!-- Voiceover: [Script (English)] -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Must include defs for filters -->
+  <defs>...</defs>
+  <!-- Must have background -->
+  <rect x="0" y="0" width="1600" height="900" fill="..." />
+  <!-- Content -->
+</svg>
+
+**Language Requirements:**
+- **All visual labels must be in English!**
+- **Voiceover script must be in English!**
+- Font color must be pure white (#FFFFFF) or high contrast color.

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html style="height: 100%">
+<head>
+    <meta charset="utf-8">
+    <title>2000-2023年全球GDP排名top10 - 动态排序图</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #f0f2f5; font-family: 'Microsoft YaHei', sans-serif; }
+        #bg-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #container { height: 100vh; width: 100vw; position: relative; z-index: 1; }
+    </style>
+</head>
+<body style="height: 100%; margin: 0">
+    <div id="bg-layer"></div>
+    <div id="container"></div>
+
+    <script type="text/javascript">
+        var dom = document.getElementById('container');
+        var myChart = echarts.init(dom);
+        var rawData = {"title": "2000-2023年全球GDP前十名国家演变", "subtitle": "单位：亿美元（数据来源：世界银行及IMF）", "categories": ["美国", "中国", "日本", "德国", "英国", "印度", "法国", "意大利", "巴西", "加拿大"], "timeline": ["2000", "2005", "2010", "2015", "2018", "2019", "2020", "2021", "2022", "2023"], "data": [[10280, 1210, 4880, 1950, 1660, 460, 1360, 1140, 650, 740], [13090, 2290, 4830, 2850, 2520, 830, 2200, 1850, 890, 1170], [14990, 6090, 5700, 3400, 2450, 1670, 2640, 2130, 2210, 1610], [18210, 11060, 4440, 3360, 2930, 2100, 2430, 1830, 1800, 1550], [20530, 13890, 5040, 3970, 2860, 2700, 2790, 2090, 1920, 1720], [21380, 14280, 5120, 3880, 2850, 2830, 2730, 2010, 1870, 1740], [20890, 14680, 5040, 3850, 2690, 2660, 2630, 1890, 1440, 1640], [23320, 17730, 5030, 4260, 3130, 3150, 2950, 2110, 1610, 2000], [25460, 17960, 4230, 4080, 3070, 3420, 2780, 2010, 1920, 2130], [27360, 17700, 4210, 4450, 3340, 3730, 3030, 2250, 2130, 2110]]};
+        
+        // Configuration Object
+        var config = {
+            colors: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+            fontFamily: 'Microsoft YaHei',
+            fontSize: 24,
+            fontColor: '#333',
+            backgroundColor: '#f0f2f5', // Deprecated in favor of backgroundStyle for complex backgrounds
+            backgroundStyle: '#f0f2f5', // Can be color or CSS gradient
+            backgroundImage: "",
+            bgOpacity: 1.0,
+            showLabel: true,
+            labelFont: 'monospace',
+            updateFrequency: 2000,
+            dataSource: "",
+            // New Bar Styles
+            barColorMode: 'category', // 'category', 'single', 'gradient'
+            barSingleColor: '#5470c6',
+            barGradient: null, // ECharts gradient object
+            barBorderRadius: 5,
+            barOpacity: 1.0
+        };
+
+        // Apply global styles
+        function applyGlobalStyles() {
+            // Prefer backgroundStyle, fallback to backgroundColor
+            var bgStyle = config.backgroundStyle || config.backgroundColor;
+            
+            // Predefined Gradients and Colors
+            var gradients = {
+                'rainbow': 'linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3)',
+                'cool': 'linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%)',
+                'warm': 'linear-gradient(120deg, #f6d365 0%, #fda085 100%)',
+                'neon': 'linear-gradient(to right, #00f260, #0575e6)',
+                'sunset': 'linear-gradient(to right, #ff7e5f, #feb47b)',
+                'ocean': 'linear-gradient(to right, #2E3192, #1BFFFF)',
+                'dark': '#1a1a1a',
+                'light': '#f0f2f5'
+            };
+
+            if (gradients[bgStyle]) {
+                bgStyle = gradients[bgStyle];
+            }
+            
+            // Check if it's a gradient (contains "gradient") or simple color
+            if (bgStyle && bgStyle.indexOf('gradient') !== -1) {
+                 document.body.style.background = bgStyle;
+            } else {
+                 document.body.style.background = "";
+                 document.body.style.backgroundColor = bgStyle;
+            }
+
+            var bgLayer = document.getElementById('bg-layer');
+            if (config.backgroundImage) {
+                bgLayer.style.backgroundImage = config.backgroundImage;
+                bgLayer.style.opacity = config.bgOpacity;
+            } else {
+                bgLayer.style.backgroundImage = "none";
+            }
+            document.body.style.fontFamily = config.fontFamily;
+        }
+        applyGlobalStyles();
+        
+        var currentYearIndex = 0;
+        var timer = null;
+
+        // 1. Static/Structural Option (Grids, Axes)
+        function getAxisOption() {
+            var itemCount = rawData.categories.length;
+            return {
+                grid: {
+                    left: 150, // Increase left margin to accommodate rank numbers
+                    right: 80,
+                    top: 80,
+                    bottom: 30,
+                    containLabel: false
+                },
+                xAxis: {
+                    type: 'value',
+                    max: 'dataMax',
+                    axisLabel: {
+                        formatter: function (n) {
+                            return Math.round(n);
+                        },
+                        fontFamily: config.fontFamily
+                    }
+                },
+                yAxis: {
+                    type: 'category',
+                    inverse: true,
+                    max: itemCount - 1,
+                    axisLabel: {
+                        show: false // Hide default labels
+                    },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    animationDuration: 300,
+                    animationDurationUpdate: 300
+                }
+            };
+        }
+
+        // Calculate and return graphic elements for rank numbers
+        function getRankGraphic() {
+            var itemCount = rawData.categories.length;
+            var elements = [];
+            
+            // Try to use convertToPixel for perfect alignment
+            var useExact = false;
+            try {
+                // Check if coordinate system is ready by testing index 0
+                // We use {gridIndex: 0} or {yAxisIndex: 0}
+                var testPos = myChart.convertToPixel({yAxisIndex: 0}, 0);
+                if (testPos) {
+                    useExact = true;
+                }
+            } catch (e) {
+                // Ignore
+            }
+
+            if (useExact) {
+                for (var i = 0; i < itemCount; i++) {
+                    var position = myChart.convertToPixel({yAxisIndex: 0}, i);
+                    elements.push({
+                        type: 'text',
+                        left: 100, // Fixed horizontal position
+                        top: position[1], // Exact Y coordinate from axis
+                        style: {
+                            text: (i + 1).toString(),
+                            textAlign: 'center',
+                            textVerticalAlign: 'middle',
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            fontFamily: config.fontFamily,
+                            fill: config.fontColor
+                        },
+                        z: 100,
+                        silent: true
+                    });
+                }
+            } else {
+                // Fallback to manual calculation (approximate)
+                var top = 80;
+                var bottom = 30;
+                var height = myChart.getHeight() - top - bottom;
+                var step = height / itemCount;
+                
+                for (var i = 0; i < itemCount; i++) {
+                    elements.push({
+                        type: 'text',
+                        left: 100,
+                        top: top + i * step + step / 2,
+                        style: {
+                            text: (i + 1).toString(),
+                            textAlign: 'center',
+                            textVerticalAlign: 'middle',
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            fontFamily: config.fontFamily,
+                            fill: config.fontColor
+                        },
+                        z: 100,
+                        silent: true
+                    });
+                }
+            }
+            return elements;
+        }
+
+        // 2. Dynamic Option (Series, Title, Graphic)
+        function getSeriesOption(index) {
+            var year = rawData.timeline[index];
+            var dataValues = rawData.data[index];
+            var itemCount = rawData.categories.length;
+            
+            var seriesData = [];
+            for (var i = 0; i < itemCount; i++) {
+                var itemColor;
+                if (config.barColorMode === 'single') {
+                    itemColor = config.barSingleColor;
+                } else if (config.barColorMode === 'gradient' && config.barGradient) {
+                    itemColor = config.barGradient;
+                } else {
+                    // Category/Default
+                    itemColor = config.colors[i % config.colors.length];
+                }
+
+                seriesData.push({
+                    value: dataValues[i],
+                    name: rawData.categories[i],
+                    itemStyle: {
+                        color: itemColor
+                    }
+                });
+            }
+
+            return {
+                title: {
+                    text: rawData.title,
+                    subtext: rawData.subtitle + ' (' + year + ')',
+                    left: 'center',
+                    top: 20,
+                    textStyle: { 
+                        fontSize: config.fontSize, 
+                        fontWeight: 'bold',
+                        fontFamily: config.fontFamily
+                    }
+                },
+                series: [{
+                    // Dynamic Race Series
+                    realtimeSort: true,
+                    name: 'Value',
+                    type: 'bar',
+                    data: seriesData,
+                    encode: {
+                        x: 'value',
+                        y: 'name'
+                    },
+                    label: {
+                        show: config.showLabel,
+                        position: 'right',
+                        valueAnimation: true,
+                        fontFamily: config.labelFont,
+                        color: config.fontColor,
+                        formatter: function(params) {
+                             return params.name + '  ' + Math.round(params.value);
+                        }
+                    },
+                    itemStyle: {
+                        borderRadius: [0, config.barBorderRadius, config.barBorderRadius, 0],
+                        opacity: config.barOpacity
+                    }
+                }],
+                animationDuration: 0,
+                animationDurationUpdate: config.updateFrequency,
+                animationEasing: 'linear',
+                animationEasingUpdate: 'linear',
+                graphic: {
+                    elements: [{
+                        type: 'text',
+                        right: 60,
+                        bottom: 60,
+                        style: {
+                            text: year,
+                            font: 'bold 80px ' + config.labelFont,
+                            fill: 'rgba(100, 100, 100, 0.25)'
+                        },
+                        z: 100
+                    }].concat(config.dataSource ? [{
+                        type: 'text',
+                        right: 10,
+                        bottom: 10,
+                        style: {
+                            text: '数据来源: ' + config.dataSource,
+                            font: '14px ' + config.fontFamily,
+                            fill: config.fontColor
+                        },
+                        z: 100
+                    }] : []).concat(getRankGraphic()) // Add rank numbers
+                }
+            };
+        }
+
+        // Function to update config from outside
+        function updateConfig(newConfig) {
+            Object.assign(config, newConfig);
+            
+            // Calculate updateFrequency if duration is provided
+            if (newConfig.duration && rawData.timeline && rawData.timeline.length > 1) {
+                config.updateFrequency = newConfig.duration / (rawData.timeline.length - 1);
+                
+                // Restart animation to apply new speed
+                if (timer) clearInterval(timer);
+                runAnimation();
+            }
+            
+            applyGlobalStyles();
+            
+            // Update structural config (Fonts, Colors)
+            myChart.setOption(getAxisOption());
+            
+            // Update data/series config
+            myChart.setOption(getSeriesOption(currentYearIndex));
+        }
+
+        // Initial render
+        myChart.setOption(getAxisOption());
+        myChart.setOption(getSeriesOption(0));
+
+        function runAnimation() {
+            if (timer) clearInterval(timer);
+            currentYearIndex = 0;
+            myChart.setOption(getSeriesOption(0));
+            
+            timer = setInterval(function () {
+                currentYearIndex++;
+                if (currentYearIndex >= rawData.timeline.length) {
+                    clearInterval(timer);
+                    return;
+                }
+                myChart.setOption(getSeriesOption(currentYearIndex));
+            }, config.updateFrequency);
+        }
+
+        setTimeout(runAnimation, 1000);
+
+        window.addEventListener('resize', function() {
+            myChart.resize();
+            // Force update of graphic elements to realign with new coordinates
+            myChart.setOption(getSeriesOption(currentYearIndex));
+        });
+
+        // Video Export Support: Deterministic Rendering
+        window.prepareTimeline = function() {
+            if (timer) clearInterval(timer);
+            currentYearIndex = 0;
+            // Reset to start
+            myChart.setOption(getSeriesOption(0));
+            
+            // Calculate total duration
+            // We have N points. There are N-1 intervals of duration config.updateFrequency.
+            var totalDuration = (rawData.timeline.length - 1) * config.updateFrequency;
+            // Add 2 seconds buffer at the end
+            totalDuration += 2000; 
+            
+            return Promise.resolve({
+                totalDuration: totalDuration
+            });
+        };
+
+        window.startSlowMotionAnimation = function(speedRatio) {
+            if (timer) clearInterval(timer);
+            
+            // Slow down
+            var originalFreq = config.updateFrequency;
+            var newFreq = originalFreq / speedRatio;
+            
+            // Update config locally
+            config.updateFrequency = newFreq;
+            
+            // Important: Update ECharts animation duration to match new frequency
+            // We need to override the default options
+            myChart.setOption({
+                animationDuration: 0, 
+                animationDurationUpdate: newFreq,
+                animationEasing: 'cubicInOut', // Smoother easing
+                animationEasingUpdate: 'cubicInOut' // Smoother easing
+            });
+            
+            currentYearIndex = 0;
+            myChart.setOption(getSeriesOption(0));
+            
+            window.animationFinished = false;
+            
+            // Start loop
+            timer = setInterval(function () {
+                currentYearIndex++;
+                if (currentYearIndex >= rawData.timeline.length) {
+                    clearInterval(timer);
+                    window.animationFinished = true;
+                    return;
+                }
+                myChart.setOption(getSeriesOption(currentYearIndex));
+            }, newFreq);
+            
+            return {
+                totalDuration: (rawData.timeline.length - 1) * newFreq + 2000 / speedRatio
+            };
+        };
+
+        window.seekTo = function(time_ms) {
+             var freq = config.updateFrequency;
+             var totalPoints = rawData.timeline.length;
+             
+             // Calculate index and ratio
+             var index = Math.floor(time_ms / freq);
+             var ratio = (time_ms % freq) / freq;
+             
+             if (index >= totalPoints - 1) {
+                 index = totalPoints - 1;
+                 ratio = 0; // Finished
+             }
+             
+             // Interpolate Data
+             var currentValues = rawData.data[index];
+             var nextValues = rawData.data[Math.min(index + 1, totalPoints - 1)];
+             
+             var interpolatedSeriesData = [];
+             for (var i = 0; i < rawData.categories.length; i++) {
+                 var startVal = currentValues[i];
+                 var endVal = nextValues[i];
+                 var val = startVal + (endVal - startVal) * ratio;
+                 
+                 // Color logic (same as getSeriesOption)
+                 var itemColor;
+                 if (config.barColorMode === 'single') {
+                    itemColor = config.barSingleColor;
+                 } else if (config.barColorMode === 'gradient' && config.barGradient) {
+                    itemColor = config.barGradient;
+                 } else {
+                    itemColor = config.colors[i % config.colors.length];
+                 }
+
+                 interpolatedSeriesData.push({
+                     value: val,
+                     name: rawData.categories[i],
+                     itemStyle: { color: itemColor }
+                 });
+             }
+             
+             var year = rawData.timeline[index]; 
+             
+             var option = {
+                 series: [{
+                     data: interpolatedSeriesData,
+                     animation: false, // CRITICAL: No internal animation
+                     realtimeSort: true,
+                     label: {
+                        show: config.showLabel,
+                        position: 'right',
+                        valueAnimation: false,
+                        formatter: function(params) {
+                             return params.name + '  ' + Math.round(params.value);
+                        },
+                        fontFamily: config.labelFont,
+                        color: config.fontColor
+                    },
+                    itemStyle: {
+                        borderRadius: [0, config.barBorderRadius, config.barBorderRadius, 0],
+                        opacity: config.barOpacity
+                    }
+                 }],
+                 animation: false,
+                 graphic: {
+                     elements: [{
+                        type: 'text',
+                        right: 60,
+                        bottom: 60,
+                        style: {
+                            text: year,
+                            font: 'bold 80px ' + config.labelFont,
+                            fill: 'rgba(100, 100, 100, 0.25)'
+                        }
+                     }].concat(config.dataSource ? [{
+                        type: 'text',
+                        right: 10,
+                        bottom: 10,
+                        style: {
+                            text: '数据来源: ' + config.dataSource,
+                            font: '14px ' + config.fontFamily,
+                            fill: config.fontColor
+                        }
+                     }] : []).concat(getRankGraphic()) 
+                 }
+             };
+             
+             myChart.setOption(option);
+        };
+
+    </script>
+</body>
+</html>

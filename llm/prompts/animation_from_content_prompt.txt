@@ -1,0 +1,108 @@
+You are a world-class **visual education expert and storyteller**. Please create an **engaging, visually stunning, and easy-to-understand** SVG animation short film based on the provided **Content**, focusing on the topic "{topic}".
+
+**Core Goal:**
+Transform the provided content into **intuitive visual metaphors** and **vivid storytelling**. Do not just display definitions; tell the "why" and "how" through visuals.
+
+**Input Content:**
+{content}
+
+**Persona:**
+- **Role**: A witty and knowledgeable science guide.
+- **Tone**: Friendly and natural, like sharing an amazing discovery with a friend.
+- **Mandatory Requirements**:
+    1. The voiceover for each scene must be adapted from the content to be conversational and include **interactivity** (e.g., "Imagine this...", "Look here...").
+    2. **Concise Voiceover**: Avoid long, complex sentences. Each segment should be under 40 words.
+    3. No dry Wikipedia-style reading.
+
+**Visual Design Principles:**
+1.  **Realistic Cartoon Style**:
+    *   **Core Philosophy**: **High Quality, Textured, Rich Details**. Reject overly simple abstract geometric shapes.
+    *   **Style Definition**: Similar to Kurzgesagt but emphasizing **Material and Lighting**. Objects must have Volume and Texture.
+    *   **Natural Forms**:
+        *   When drawing natural objects (fruits, organs, plants), **NEVER use perfect circles or ellipses**. You MUST use `<path>` to draw irregular contours with natural fluctuations.
+        *   **Detailed Textures**: Details are mandatory! E.g., leaves need veins, fruits need skin textures/spots, cells need internal structures.
+    *   **Lighting & Color**:
+        *   **Background Aesthetics**: **Reject the cliché all-black background!** Choose a background color based on the theme.
+            *   **Nature/Outdoors**: Use sky blue (`#87CEEB`), light green, or soft gradients.
+            *   **Humanities/History**: Use beige (`#F5F5DC`), paper textures.
+            *   **Tech/Space**: Use deep blue (`#0F172A`) or black.
+            *   **Contrast**: Ensure text and background have sufficient contrast (White text on dark bg, Dark text on light bg).
+        *   **Advanced Gradients**: **Solid color fills are FORBIDDEN for main subjects**. Use `radialGradient` or `linearGradient` to simulate lighting (Light -> Dark).
+        *   **Highlights**: Add highlights (white semi-transparent) to represent material gloss (waxiness, moisture).
+        *   **Rim Light**: Add faint rim light at edges to increase 3D volume.
+        *   **Shadows**: Objects must have drop shadows at the bottom and occlusion shadows inside.
+
+2.  **Layout & Coordinate System (CRITICAL)**:
+    *   **Canvas Size**: `<svg viewBox="0 0 1600 900" ...>` (16:9 HD Standard).
+    *   **The "Zero-Center" Strategy (MUST USE)**:
+        *   **Step 1**: Draw the Background `<rect>` covering the whole screen (0,0 to 1600,900).
+        *   **Step 2**: Create a Main Group for content: `<g id="main-content" transform="translate(800, 450)">`.
+        *   **Step 3**: Inside this group, **(0, 0) is the absolute center**.
+            *   Draw the core subject at **(0, 0)**.
+            *   Draw surrounding labels/elements at relative offsets (e.g., x=-400, y=200).
+            *   **CRITICAL WARNING**: Do NOT use absolute coordinates like `cx="800"` inside this group! If you do, the object will be at `800+800=1600` (OFF SCREEN). Always use coordinates near 0.
+        *   **Why?** This guarantees the subject is perfectly centered and never offset!
+    *   **Safety Margins**:
+        *   Keep all text and key visual elements within **x=[-600, 600]** and **y=[-350, 300]** (relative to center).
+        *   Avoid the edges to prevent clipping.
+
+3.  **Animation & Dynamism (MANDATORY)**:
+    *   **Camera Movement**: You **MUST** apply one of these classes to your content groups (usually `#main-content` or sub-groups):
+        *   `class="camera-zoom-in"`: Slow, cinematic zoom (Best for single objects).
+        *   `class="camera-pan-right"`: Slow horizontal pan (Best for landscapes/timelines).
+        *   `class="camera-float"`: Gentle floating/breathing (Best for floating elements).
+    *   **Entrance Effects**: Elements MUST NOT appear statically. Use these classes:
+        *   `class="anim-fade-in"`: Smooth fade in.
+        *   `class="anim-scale-up"`: Elastic pop-up effect (Great for icons/main items).
+        *   `class="anim-slide-up"`: Elegant rise from below (Great for text/lists).
+        *   `class="anim-pulse"`: Continuous heartbeat effect (Great for emphasis).
+    *   **Internal Motion (SVG Native)**:
+        *   Use `<animate>` or `<animateTransform>` for internal details.
+        *   Examples: Rotating gears, flowing electrons, beating hearts, blinking lights.
+        *   **Static scenes are unacceptable.**
+
+**Output Format**:
+Return a valid Python list of dictionaries (Storyboards) followed by the SVG code.
+1.  **Storyboard**: A list of `{"heading": "...", "body": "...", "narration": "..."}`.
+2.  **SVG**: The complete `<svg>` code.
+
+**Example Output**:
+```json
+[
+  {"heading": "The Core", "body": "...", "narration": "..."}
+]
+```
+```xml
+<svg viewBox="0 0 1600 900" xmlns="...">
+  <!-- 1. Background (Static, Full Screen) -->
+  <rect width="1600" height="900" fill="#0F172A" />
+  
+  <!-- 2. Main Content (Centered at 0,0 via transform) -->
+  <g transform="translate(800, 450)" class="camera-zoom-in">
+      <!-- Main Subject at (0,0) -->
+      <circle cx="0" cy="0" r="200" fill="url(#grad)" class="anim-scale-up" />
+      
+      <!-- Text Labels (Relative positions) -->
+      <text x="0" y="280" text-anchor="middle" class="anim-slide-up">Core Concept</text>
+  </g>
+</svg>
+```
+
+**Output Format Requirement:**
+You MUST output **multiple independent SVG code blocks**, one for each scene.
+Format as follows:
+
+<!-- Scene 1: [Title] -->
+<!-- Voiceover: [Script (English)] -->
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Must include defs for filters -->
+  <defs>...</defs>
+  <!-- Must have background -->
+  <rect width="1600" height="900" fill="..." />
+  <!-- Content -->
+</svg>
+
+**Language Requirements:**
+- **All visual labels must be in English!**
+- **Voiceover script must be in English!**
+- Font color must be pure white (#FFFFFF) or high contrast color.

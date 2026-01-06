@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html style="height: 100%">
+<head>
+    <meta charset="utf-8">
+    <title>{{TITLE}}</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body style="height: 100%; margin: 0; background-color: {{BG_COLOR}}; font-family: '{{FONT}}', sans-serif;">
+    <div id="container" style="height: 100%"></div>
+    <script type="text/javascript">
+        var dom = document.getElementById('container');
+        var myChart = echarts.init(dom);
+        var app = {};
+        
+        var option = {{OPTION_JSON}};
+        
+        // Inject tooltip formatter for full text display
+        option.tooltip = option.tooltip || {};
+        option.tooltip.formatter = function(params) {
+            var data = params.data || {};
+            var content = data.full_name || params.name;
+            if (params.value && !isNaN(params.value)) {
+                 content += ': ' + params.value;
+            }
+            return content ? content.replace(/\n/g, '<br/>') : '';
+        };
+        
+        // Add edgeLabel formatter function (cannot be passed via JSON)
+        if (option.series) {
+            option.series.forEach(function(s) {
+                if (s.type === 'tree') {
+                    s.edgeLabel = {
+                        show: true,
+                        formatter: function (params) {
+                            return params.data.edge_label || '';
+                        },
+                        fontSize: 10,
+                        color: '#666',
+                        backgroundColor: 'white',
+                        padding: [2, 4],
+                        borderRadius: 4
+                    };
+                }
+            });
+        }
+
+        if (option && typeof option === 'object') {
+            myChart.setOption(option);
+        }
+        
+        window.addEventListener('resize', myChart.resize);
+
+        // Support for slow motion recording
+        window.startSlowMotionAnimation = function(speedRatio) {
+            // Get base duration (default 1000ms if not set)
+            var baseDuration = 1000;
+            if (option.series && option.series[0]) {
+                baseDuration = option.series[0].animationDuration || 1000;
+            }
+            
+            // Calculate slowed down duration
+            var newDuration = baseDuration / speedRatio;
+            
+            console.log("Starting slow motion animation. Base:", baseDuration, "New:", newDuration);
+            
+            // Update all series
+            var newSeries = [];
+            if (option.series) {
+                option.series.forEach(function(s) {
+                    newSeries.push({
+                        animationDuration: newDuration,
+                        animationDurationUpdate: newDuration
+                    });
+                });
+            }
+            
+            // Update chart
+            myChart.setOption({
+                series: newSeries
+            });
+            
+            // Restart animation by clearing and resetting
+            myChart.clear();
+            myChart.setOption(option);
+            
+            return { totalDuration: newDuration };
+        };
+    </script>
+</body>
+</html>

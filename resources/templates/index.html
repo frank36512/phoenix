@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnowledgeSight 知识可视化工作台</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-soft: #6366F1;
+            --bg: #F5F6FF;
+            --panel: rgba(255, 255, 255, 0.96);
+            --shadow: 0 28px 68px rgba(79, 70, 229, 0.18);
+            --radius: 18px;
+            --edge-color: #CBD5F5;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 36px;
+            min-height: 100vh;
+            background: linear-gradient(140deg, #EEF2FF 0%, #E0E7FF 40%, #F8FAFF 100%);
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            color: #111827;
+        }
+        header { text-align: center; margin-bottom: 32px; }
+        header h1 { margin: 0; font-size: 2.6rem; color: var(--primary); }
+        header p { margin-top: 12px; color: #4C51BF; }
+        .controls { display: flex; align-items: center; gap: 12px; max-width: 960px; margin: 0 auto 24px; }
+        .controls .ghost { padding: 12px 20px; border-radius: var(--radius); box-shadow: var(--shadow); }
+        .controls input[type="text"] { flex: 1; padding: 14px 18px; border-radius: var(--radius); border: 1px solid #C7D2FE; background: #FFFFFF; font-size: 1rem; }
+        .controls input[type="text"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); }
+        button.primary { padding: 14px 26px; border-radius: var(--radius); border: none; background: var(--primary); color: #FFFFFF; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: var(--shadow); transition: transform 0.2s ease; }
+        button.primary:hover { transform: translateY(-1px); }
+        label.toggle { display: flex; align-items: center; gap: 8px; color: #4C51BF; font-size: 0.95rem; }
+        .loader { text-align: center; margin: 24px 0; padding: 20px; background: rgba(79, 70, 229, 0.08); border-radius: 12px; color: #4C51BF; }
+        .loader .dots { display: inline-flex; gap: 8px; }
+        .loader .dots span { width: 12px; height: 12px; border-radius: 50%; background: var(--primary); animation: bounce 1.4s infinite ease-in-out; }
+        .loader .dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loader .dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0.8); opacity: 0.7; } 40% { transform: scale(1.2); opacity: 1; } }
+        .loader p { margin: 10px 0 0 0; font-size: 0.95rem; }
+        #error-box { max-width: 960px; margin: 0 auto 24px; padding: 18px 24px; background: #FEE2E2; color: #B91C1C; border-radius: var(--radius); border: 1px solid #FCA5A5; }
+        section.viewer { max-width: 1180px; margin: 0 auto; background: var(--panel); border-radius: 26px; padding: 28px 32px 36px; box-shadow: var(--shadow); }
+        .tabs { display: flex; gap: 16px; border-bottom: 1px solid #C7D2FE; margin-bottom: 20px; }
+        .tabs button { background: transparent; border: none; padding: 12px 24px; font-size: 1rem; font-weight: 600; color: #6B7280; cursor: pointer; position: relative; }
+        .tabs button.active { color: var(--primary); }
+        .tabs button.active::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 100%; height: 3px; border-radius: 999px; background: var(--primary); }
+        .animation-frame { background: linear-gradient(160deg, rgba(79,70,229,0.1), rgba(129,140,248,0.14)); border-radius: 22px; padding: 12px; }
+        .export-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+        .graph-toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+        button.ghost { border: none; border-radius: 10px; padding: 8px 18px; background: rgba(79, 70, 229, 0.14); color: var(--primary); cursor: pointer; transition: background 0.2s ease; }
+        button.ghost:hover { background: rgba(79, 70, 229, 0.22); }
+        select.ghost { border: 1px solid #C7D2FE; border-radius: 10px; padding: 8px 12px; background: #FFFFFF; color: var(--primary); cursor: pointer; font-size: 0.9rem; }
+        #graph-surface { width: 100%; height: 460px; border-radius: 18px; border: 1px solid #C7D2FE; background: rgba(255, 255, 255, 0.94); }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.42); display: flex; justify-content: center; align-items: center; z-index: 50; }
+        .modal-backdrop.is-hidden { display: none; }
+        .modal { width: min(520px, calc(100% - 40px)); max-height: calc(100vh - 80px); overflow-y: auto; background: #FFFFFF; border-radius: 20px; box-shadow: 0 30px 60px rgba(79, 70, 229, 0.25); padding: 24px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h2 { margin: 0; font-size: 1.4rem; color: var(--primary); }
+        .modal-tabs { display: flex; gap: 12px; border-bottom: 1px solid #C7D2FE; margin: 0 0 18px; }
+        .modal-tabs button { background: transparent; border: none; padding: 10px 18px; font-size: 0.95rem; font-weight: 600; color: #6B7280; cursor: pointer; position: relative; }
+        .modal-tabs button.active { color: var(--primary); }
+        .modal-tabs button.active::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 100%; height: 3px; border-radius: 999px; background: var(--primary); }
+        .modal-body { margin-bottom: 20px; }
+        .settings-pane { display: none; flex-direction: column; gap: 14px; }
+        .settings-pane.active { display: flex; }
+        .modal-body h3 { margin: 12px 0 0; font-size: 1.05rem; color: #3730A3; }
+        .modal-body label { display: flex; flex-direction: column; gap: 6px; font-size: 0.95rem; color: #4C51BF; }
+        .modal-body input, .modal-body select, .modal-body textarea { padding: 10px 12px; border-radius: 12px; border: 1px solid #C7D2FE; font-size: 1rem; resize: vertical; }
+        .modal-body input:focus, .modal-body select:focus, .modal-body textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18); }
+        .modal-footer { display: flex; justify-content: flex-end; }
+        .icon-button { background: transparent; border: none; font-size: 1.4rem; color: #6B7280; cursor: pointer; }
+        .icon-button:hover { color: var(--primary); }
+        
+        /* New Layout Styles */
+        .main-container { display: flex; gap: 32px; height: calc(100vh - 72px); }
+        .sidebar { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; overflow-y: auto; padding-right: 10px; }
+        .content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+        
+        /* Sidebar specific overrides */
+        .sidebar header { text-align: left; margin-bottom: 24px; }
+        .sidebar header h1 { font-size: 2rem; }
+        .sidebar .controls { flex-direction: column; align-items: stretch; margin: 0; max-width: none; }
+        .sidebar .controls input[type="text"] { width: 100%; }
+        
+        /* Content area overrides */
+        .content-area section.viewer { height: 100%; display: flex; flex-direction: column; max-width: none; margin: 0; padding: 20px; }
+        .content-area .tab-pane { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .content-area #graph-surface { height: 100%; flex: 1; }
+        .content-area .animation-frame { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .content-area #animation-stage { flex: 1; width: 100%; height: 100%; }
+
+        @media (max-width: 960px) { 
+            body { padding: 20px; } 
+            .main-container { flex-direction: column; height: auto; }
+            .sidebar { width: 100%; height: auto; overflow-y: visible; }
+            .content-area { height: 600px; }
+            .controls { flex-direction: column; align-items: stretch; } 
+            button.primary { width: 100%; } 
+            .controls .ghost { width: 100%; } 
+        }
+    </style>
+    <link href="../static/vis.min.css" rel="stylesheet" type="text/css">
+    <script src="../static/vis.min.js"></script>
+    <script src="../static/app.js?v=3"></script>
+</head>
+<body>
+    <div class="main-container">
+        <aside class="sidebar">
+            <header>
+                <h1>KnowledgeSight 知识可视化工作台</h1>
+                <p>把复杂主题转化为动画与知识图谱</p>
+            </header>
+
+            <div class="controls">
+                <input id="topic-input" type="text" placeholder="输入主题，例如：量子纠缠" autocomplete="off">
+                <button id="generate-btn" class="primary">生成动画</button>
+                <button id="settings-btn" class="ghost">设置</button>
+            </div>
+
+            <div id="loader" class="loader" hidden>
+                <div class="dots"><span></span><span></span><span></span></div>
+                <p>正在生成内容，请稍候…</p>
+            </div>
+        </aside>
+
+        <main class="content-area">
+            <div id="error-box" hidden></div>
+
+            <section id="viewer" class="viewer" hidden>
+        <div class="tabs">
+            <button id="tab-animation" class="active" data-tab="animation">动画演示</button>
+            <button id="tab-graph" data-tab="graph">知识图谱</button>
+        </div>
+
+        <div id="animation-pane" class="tab-pane" style="display: block;">
+            <div class="animation-frame">
+                <div id="animation-stage"></div>
+            </div>
+            <div class="export-actions">
+                <button id="export-btn" class="ghost">导出动画 (HTML)</button>
+                <button id="export-video-btn" class="ghost">导出动画 (视频)</button>
+            </div>
+        </div>
+
+        <div id="graph-pane" class="tab-pane" style="display: none;">
+            <div class="graph-toolbar">
+                <label class="toggle" style="margin-right: 12px;">
+                    <input type="checkbox" id="dynamic-graph-toggle">
+                    动态图谱
+                </label>
+                <select id="graph-layout-select" class="ghost" title="布局样式">
+                    <option value="force">力导向布局</option>
+                    <option value="hierarchical-ud">层次-上下</option>
+                    <option value="hierarchical-lr">层次-左右</option>
+                    <option value="hierarchical-rl">层次-右左</option>
+                    <option value="circular">环形布局</option>
+                    <option value="radial">辐射布局</option>
+                    <option value="tree">树形布局</option>
+                    <option value="grid">网格布局</option>
+                    <option value="concentric">同心圆布局</option>
+                    <option value="spiral">螺旋布局</option>
+                    <option value="star">星形布局</option>
+                    <option value="cluster">聚类布局</option>
+                </select>
+                <select id="graph-color-select" class="ghost" title="颜色主题">
+                    <option value="default">形状颜色</option>
+                    <option value="rainbow">🌈 彩虹渐变</option>
+                    <option value="ocean">🌊 海洋蓝</option>
+                    <option value="forest">🌲 森林绿</option>
+                    <option value="sunset">🌅 日落橙</option>
+                    <option value="purple">🔮 神秘紫</option>
+                    <option value="tech">💻 科技蓝</option>
+                    <option value="warm">🔥 暖色调</option>
+                    <option value="cool">❄️ 冷色调</option>
+                    <option value="monochrome">🌑 单色灰</option>
+                    <option value="candy">🍬 糖果色</option>
+                    <option value="autumn">🍂 秋日暖阳</option>
+                    <option value="aurora">🌌 极光渐变</option>
+                    <option value="cyberpunk">🌃 赛博朋克</option>
+                    <option value="pastel">🎨 柔和粉彩</option>
+                </select>
+                <select id="graph-bg-select" class="ghost" title="背景颜色">
+                    <option value="default">背景颜色</option>
+                    <option value="dark">深空黑</option>
+                    <option value="midnight">午夜蓝</option>
+                    <option value="cream">柔和米</option>
+                    <option value="mint">清新薄荷</option>
+                    <option value="lavender">淡雅紫</option>
+                    <option value="gradient-blue">🔵 渐变蓝</option>
+                    <option value="gradient-purple">🟣 渐变紫</option>
+                    <option value="gradient-dark">⚫ 渐变黑</option>
+                </select>
+                <button id="zoom-in" class="ghost">放大</button>
+                <button id="zoom-out" class="ghost">缩小</button>
+                <button id="reset-view" class="ghost">重置视图</button>
+                <button id="export-graph-image" class="ghost">导出图片 (PNG)</button>
+                <button id="export-graph-svg" class="ghost">导出矢量图 (SVG)</button>
+            </div>
+            <div id="graph-surface"></div>
+        </div>
+    </section>
+    </main>
+    </div>
+
+    <div id="settings-modal" class="modal-backdrop is-hidden" aria-hidden="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>设置</h2>
+                <button id="settings-close" class="icon-button" aria-label="关闭设置">×</button>
+            </div>
+            <div class="modal-tabs">
+                <button data-tab="video" class="active">视频导出</button>
+                <button data-tab="api">API 设置</button>
+                <button data-tab="voice">语音设置</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-pane active" data-pane="video">
+                    <label>
+                        视频分辨率
+                        <select id="setting-resolution">
+                            <option value="1080p">1080p</option>
+                            <option value="720p">720p</option>
+                            <option value="4k">4K</option>
+                        </select>
+                    </label>
+                    <label>
+                        每个画面时长 (秒)
+                        <input id="setting-duration" type="number" min="3" max="20" step="1">
+                    </label>
+                    <label>
+                        帧率 (FPS)
+                        <input id="setting-fps" type="number" min="24" max="60" step="1">
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="setting-audio" checked>
+                        导出时包含配音
+                    </label>
+                </div>
+                <div class="settings-pane" data-pane="api">
+                    <p style="background: #E0E7FF; padding: 12px; border-radius: 8px; font-size: 0.95em; color: #3730A3; margin-bottom: 16px;">
+                        💡 配置 OpenAI 兼容接口（支持 OpenAI、Gemini、Xiaoai 等）
+                    </p>
+                    <label>
+                        <strong>API Key</strong>
+                        <input id="setting-api-key" type="password" autocomplete="off" placeholder="sk-...">
+                    </label>
+                    <label>
+                        <strong>Base URL</strong>
+                        <input id="setting-api-base" type="text" autocomplete="off" placeholder="https://api.openai.com/v1">
+                    </label>
+                    <label>
+                        <strong>模型名称</strong>
+                        <input id="setting-api-model" type="text" autocomplete="off" placeholder="gpt-4o-mini">
+                    </label>
+                    
+                    <div style="background: #F3F4F6; padding: 10px; border-radius: 6px; font-size: 0.85em; color: #4B5563; margin-top: 12px;">
+                        <strong>常用配置参考：</strong><br>
+                        <strong>OpenAI:</strong> https://api.openai.com/v1<br>
+                        <strong>302.AI:</strong> https://api.302.ai/v1<br>
+                        <strong>Xiaoai:</strong> https://xiaoai.plus/v1<br>
+                        <strong>DeepSeek:</strong> https://api.deepseek.com
+                    </div>
+                    
+                    <label>
+                        系统提示词 (可选)
+                        <textarea id="setting-system-prompt" rows="3" placeholder="自定义系统提示词"></textarea>
+                    </label>
+                </div>
+                <div class="settings-pane" data-pane="voice">
+                    <label>
+                        <strong>TTS 语音引擎</strong>
+                        <select id="setting-tts-engine" style="font-weight: 600; color: #4F46E5;">
+                            <option value="edge_tts">Edge TTS (微软)</option>
+                            <option value="xiaoai">Xiaoai TTS (OpenAI兼容)</option>
+                            <option value="aliyun">通义千问 (Aliyun CosyVoice)</option>
+                            <option value="pyttsx3">本地引擎 (离线)</option>
+                        </select>
+                    </label>
+                    
+                    <!-- Edge TTS 配置 -->
+                    <div id="edge-tts-config" class="tts-config-panel">
+                        <div style="background: #FEF3C7; padding: 12px; border-radius: 8px; margin: 12px 0;">
+                            <p style="margin: 0; font-size: 0.9em; color: #92400E;">
+                                💡 <strong>Edge TTS</strong> - 微软免费高质量语音，推荐使用
+                            </p>
+                        </div>
+                        <label>
+                            发音人
+                            <select id="edge-voice">
+                                <option value="zh-CN-XiaoxiaoNeural">晓晓 (女声，温柔)</option>
+                                <option value="zh-CN-YunxiNeural">云希 (男声，年轻)</option>
+                                <option value="zh-CN-YunyangNeural">云扬 (男声，成熟)</option>
+                                <option value="zh-CN-XiaoyiNeural">晓伊 (女声，活泼)</option>
+                                <option value="zh-CN-YunyeNeural">云野 (男声，专业)</option>
+                                <option value="zh-CN-XiaochenNeural">晓辰 (女声，沉稳)</option>
+                                <option value="en-US-AriaNeural">Aria (女声，美式英语)</option>
+                                <option value="en-US-GuyNeural">Guy (男声，美式英语)</option>
+                            </select>
+                        </label>
+                        <label>
+                            语速
+                            <select id="edge-rate">
+                                <option value="-50%">很慢 (0.5x)</option>
+                                <option value="-25%">较慢 (0.75x)</option>
+                                <option value="+0%">正常 (1.0x)</option>
+                                <option value="+25%">较快 (1.25x)</option>
+                                <option value="+50%">很快 (1.5x)</option>
+                            </select>
+                        </label>
+                        <label>
+                            音量
+                            <input type="range" id="edge-volume" min="0" max="100" step="5" value="100">
+                            <span id="edge-volume-value">100%</span>
+                        </label>
+                        <label>
+                            音调
+                            <select id="edge-pitch">
+                                <option value="-10%">低沉</option>
+                                <option value="-5%">略低</option>
+                                <option value="+0%">正常</option>
+                                <option value="+5%">略高</option>
+                                <option value="+10%">高亢</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <!-- Xiaoai TTS 配置 -->
+                    <div id="xiaoai-tts-config" class="tts-config-panel" style="display: none;">
+                        <div style="background: #E0E7FF; padding: 12px; border-radius: 8px; margin: 12px 0;">
+                            <p style="margin: 0; font-size: 0.9em; color: #3730A3;">
+                                🤖 <strong>Xiaoai TTS</strong> - 使用 OpenAI 兼容接口
+                            </p>
+                        </div>
+                        <label>
+                            API Key
+                            <input id="setting-xiaoai-tts-key" type="password" placeholder="sk-..." autocomplete="off">
+                        </label>
+                        <label>
+                            Base URL
+                            <input id="setting-xiaoai-tts-base" type="text" value="https://xiaoai.plus/v1" placeholder="https://xiaoai.plus/v1">
+                        </label>
+                        <label>
+                            模型名称 (Model)
+                            <input id="setting-xiaoai-tts-model" type="text" value="tts-1" placeholder="tts-1, tts-1-hd">
+                        </label>
+                        <label>
+                            发音人 (Voice)
+                            <select id="setting-xiaoai-voice">
+                                <option value="alloy">Alloy (合金)</option>
+                                <option value="echo">Echo (回声)</option>
+                                <option value="fable">Fable (寓言)</option>
+                                <option value="onyx">Onyx (玛瑙)</option>
+                                <option value="nova">Nova (新星)</option>
+                                <option value="shimmer">Shimmer (微光)</option>
+                            </select>
+                        </label>
+                        <label>
+                            语速 (Speed)
+                            <input type="range" id="setting-xiaoai-speed" min="0.25" max="4.0" step="0.25" value="1.0">
+                            <span id="xiaoai-speed-value">1.0x</span>
+                        </label>
+                    </div>
+
+                    <!-- Aliyun TTS 配置 -->
+                    <div id="aliyun-tts-config" class="tts-config-panel" style="display: none;">
+                        <div style="background: #FFF7ED; padding: 12px; border-radius: 8px; margin: 12px 0;">
+                            <p style="margin: 0; font-size: 0.9em; color: #9A3412;">
+                                🗣️ <strong>通义千问 TTS</strong> - Aliyun CosyVoice
+                            </p>
+                        </div>
+                        <label>
+                            API Key (DashScope)
+                            <input id="setting-aliyun-tts-key" type="password" placeholder="sk-..." autocomplete="off">
+                        </label>
+                        <label>
+                            Base URL
+                            <input id="setting-aliyun-base" type="text" value="https://dashscope.aliyuncs.com/api/v1" placeholder="https://dashscope.aliyuncs.com/api/v1">
+                        </label>
+                        <label>
+                            模型名称 (Model)
+                            <input id="setting-aliyun-model" type="text" value="qwen3-tts-flash" placeholder="qwen3-tts-flash">
+                        </label>
+                        <label>
+                            发音人 (Voice)
+                            <select id="setting-aliyun-voice">
+                                <!-- Qwen3 Voices (Default) -->
+                                <option value="Cherry">芊悦 (阳光积极小姐姐)</option>
+                                <option value="Serena">苏瑶 (温柔小姐姐)</option>
+                                <option value="Ethan">晨煦 (阳光温暖男声)</option>
+                                <option value="Chelsie">千雪 (二次元虚拟女友)</option>
+                                <option value="Momo">茉兔 (撒娇搞怪)</option>
+                                <option value="Vivian">十三 (拽拽的小暴躁)</option>
+                                <option value="Moon">月白 (率性帅气)</option>
+                                <option value="Maia">四月 (知性温柔)</option>
+                                <option value="Kai">凯 (耳朵SPA)</option>
+                                <option value="Nofish">不吃鱼 (设计师)</option>
+                                <option value="Bella">萌宝 (小萝莉)</option>
+                                <option value="Jennifer">詹妮弗 (电影质感美语)</option>
+                                <option value="Ryan">甜茶 (戏感炸裂)</option>
+                                <option value="Katerina">卡捷琳娜 (御姐音)</option>
+                                <option value="Aiden">艾登 (美语大男孩)</option>
+                                <option value="Eldric Sage">沧明子 (沉稳老者)</option>
+                                <option value="Mia">乖小妹 (温顺如春水)</option>
+                                <option value="Mochi">沙小弥 (聪明小大人)</option>
+                                <option value="Bellona">燕铮莺 (声音洪亮)</option>
+                                <option value="Vincent">田叔 (沙哑烟嗓)</option>
+                                <option value="Bunny">萌小姬 (萌属性爆棚)</option>
+                                <option value="Neil">阿闻 (新闻主持人)</option>
+                                <option value="Elias">墨讲师 (严谨讲师)</option>
+                                <option value="Arthur">徐大爷 (质朴嗓音)</option>
+                                <option value="Nini">邻家妹妹 (软糯嗓音)</option>
+                                <option value="Ebona">诡婆婆 (幽暗低语)</option>
+                                <option value="Seren">小婉 (温和助眠)</option>
+                                <option value="Pip">顽屁小孩 (调皮捣蛋)</option>
+                                <option value="Stella">少女阿月 (迷糊/正义少女)</option>
+                            </select>
+                        </label>
+                        <label>
+                            语速 (Rate)
+                            <input type="range" id="setting-aliyun-rate" min="0.5" max="2.0" step="0.1" value="1.0">
+                            <span id="aliyun-rate-value">1.0x</span>
+                        </label>
+                        <label>
+                            音量 (Volume)
+                            <input type="range" id="setting-aliyun-volume" min="0" max="100" step="5" value="50">
+                            <span id="aliyun-volume-value">50</span>
+                        </label>
+                    </div>
+                    
+                    <!-- pyttsx3 配置 -->
+                    <div id="pyttsx3-config" class="tts-config-panel" style="display: none;">
+                        <div style="background: #F3F4F6; padding: 12px; border-radius: 8px; margin: 12px 0;">
+                            <p style="margin: 0; font-size: 0.9em; color: #374151;">
+                                💻 <strong>本地引擎</strong> - 离线可用，但音质较低，适合测试
+                            </p>
+                        </div>
+                        <label>
+                            语速
+                            <input type="range" id="pyttsx3-rate" min="100" max="300" step="10" value="200">
+                            <span id="pyttsx3-rate-value">200 词/分钟</span>
+                        </label>
+                        <label>
+                            音量
+                            <input type="range" id="pyttsx3-volume" min="0" max="100" step="5" value="100">
+                            <span id="pyttsx3-volume-value">100%</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="settings-save" class="primary">保存</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.min.js"></script>
+    <script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

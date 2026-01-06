@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html style="height: 100%">
+<head>
+    <meta charset="utf-8">
+    <title>Mindmap</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body style="height: 100%; margin: 0; background-color: #f0f2ff; font-family: 'Microsoft YaHei', sans-serif;">
+    <div id="container" style="height: 100%"></div>
+    <script type="text/javascript">
+        var dom = document.getElementById('container');
+        var myChart = echarts.init(dom);
+        var app = {};
+        
+        var option = {"backgroundColor": "#f0f2ff", "tooltip": {"trigger": "item", "triggerOn": "mousemove"}, "toolbox": {"show": true, "feature": {"saveAsImage": {"show": true, "title": "保存图片", "pixelRatio": 2}, "restore": {"show": true, "title": "恢复"}}}, "series": [{"type": "tree", "symbolSize": 9, "edgeShape": "curve", "roam": true, "lineStyle": {"color": "#ccc", "curveness": 0.5, "width": 2}, "label": {"position": "left", "verticalAlign": "middle", "align": "right", "fontSize": 16, "color": "#1f2937", "fontFamily": "Microsoft YaHei"}, "leaves": {"label": {"position": "right", "verticalAlign": "middle", "align": "left"}}, "emphasis": {"focus": "descendant"}, "expandAndCollapse": true, "animationDuration": 550, "animationDurationUpdate": 750, "initialTreeDepth": 2, "itemStyle": {"color": "#4F46E5", "borderColor": "#4F46E5"}, "data": [{"name": "地球", "children": [{"name": "概述", "children": [{"name": "要点1", "children": [], "type": "list", "value": 1}, {"name": "要点2", "children": [], "type": "list", "value": 1}, {"name": "要点3", "children": [], "type": "list", "value": 1}], "type": "header", "value": 3}], "type": "header", "value": 3, "symbolSize": 25, "label": {"fontSize": 24, "fontWeight": "bold", "position": "left"}}], "left": "50%", "right": "20%", "orient": "LR"}, {"type": "tree", "symbolSize": 9, "edgeShape": "curve", "roam": true, "lineStyle": {"color": "#ccc", "curveness": 0.5, "width": 2}, "label": {"position": "right", "verticalAlign": "middle", "align": "left", "fontSize": 16, "color": "#1f2937", "fontFamily": "Microsoft YaHei"}, "leaves": {"label": {"position": "left", "verticalAlign": "middle", "align": "right"}}, "emphasis": {"focus": "descendant"}, "expandAndCollapse": true, "animationDuration": 550, "animationDurationUpdate": 750, "initialTreeDepth": 2, "itemStyle": {"color": "#4F46E5", "borderColor": "#4F46E5"}, "data": [{"name": "地球", "children": [], "type": "header", "value": 3, "symbolSize": 0, "label": {"show": false}}], "left": "20%", "right": "50%", "orient": "RL"}]};
+        
+        // Add edgeLabel formatter function (cannot be passed via JSON)
+        if (option.series) {
+            option.series.forEach(function(s) {
+                if (s.type === 'tree') {
+                    s.edgeLabel = {
+                        show: true,
+                        formatter: function (params) {
+                            return params.data.edge_label || '';
+                        },
+                        fontSize: 10,
+                        color: '#666',
+                        backgroundColor: 'white',
+                        padding: [2, 4],
+                        borderRadius: 4
+                    };
+                }
+            });
+        }
+
+        if (option && typeof option === 'object') {
+            myChart.setOption(option);
+        }
+        
+        window.addEventListener('resize', myChart.resize);
+    </script>
+</body>
+</html>
