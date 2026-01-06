@@ -65,3 +65,9 @@ resources/offline/animations/*
 !resources/offline/animations/.gitkeep
 resources/offline/audio/*
 !resources/offline/audio/.gitkeep
+resources/offline/bar_races/*
+!resources/offline/bar_races/.gitkeep
+resources/offline/geo_maps/*
+!resources/offline/geo_maps/.gitkeep
+resources/offline/mindmaps/*
+!resources/offline/mindmaps/.gitkeep
