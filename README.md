@@ -48,7 +48,32 @@
 
 ---
 
-## 🚀 快速开始 (Quick Start)
+## � 演示与截图 (Demo & Screenshots)
+
+### 🎥 演示视频 (Demo Video)
+
+[![Demo Video](assets/shot0.png)](assets/demovideo.mp4)
+
+> 点击图片观看演示视频 / Click the image to watch the demo video
+
+### 📸 截图预览 (Screenshots)
+
+| | | |
+|:---:|:---:|:---:|
+| ![Shot 0](assets/shot0.png) | ![Shot 1](assets/shot1.png) | ![Shot 2](assets/shot2.png) |
+| ![Shot 3](assets/shot3.png) | ![Shot 4](assets/shot4.png) | ![Shot 5](assets/shot5.png) |
+
+---
+
+## ⬇️ 下载 (Download)
+
+您可以直接下载打包好的 Windows 可执行文件 (.exe)，无需安装 Python 环境即可运行。
+
+*   **下载地址 (Download Link)**: [夸克网盘 (Quark Pan)](https://pan.quark.cn/s/2f74b490628e)
+
+---
+
+## �� 快速开始 (Quick Start)
 
 ### 🛠️ 环境要求 (Prerequisites)
 
